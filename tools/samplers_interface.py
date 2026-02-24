@@ -61,6 +61,7 @@ class SamplersInterface:
             print('NAUTILUS SAMPLING FINISHED')
 
         sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
+                           ranges={par: val['prior'] for par,val in parameters.items()},
                            names=list(nautilus_dict.keys()),
                            labels=list(nautilus_dict.values()))
         
