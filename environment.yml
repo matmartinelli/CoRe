@@ -1,0 +1,17 @@
+name: CoRe_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scipy
+  - ipykernel
+  - getdist
+  - nautilus-sampler
+  - pip
+  - pip:
+    - black

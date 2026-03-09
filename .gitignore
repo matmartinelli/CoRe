@@ -1,0 +1,59 @@
+# --- Python Junk ---
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Conda & Environments ---
+.conda/
+env/
+envs/
+venv/
+.venv/
+# If you keep your environment.yml here, don't ignore it! 
+# But ignore the actual environment folders.
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+# Remove the next line if you WANT to commit notebook checkpoints (usually you don't)
+.virtual_documents/
+
+# --- VS Code & Editors ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.history/
+*.code-workspace
+
+# --- OS Specific (Linux/macOS) ---
+.DS_Store
+.directory
+.Trash-*
+bin/
+obj/
+
+# --- Scientific Computing / Data ---
+# Ignore large data files (adjust extensions as needed)
+*.csv
+*.h5
+*.fits
+*.npy
+*.npz
+*.log

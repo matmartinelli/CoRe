@@ -9,6 +9,8 @@ import jax.random as random
 
 from getdist import MCSamples
 
+from tools.samplers_interface import SamplersInterface
+
 jax.config.update("jax_enable_x64", True)
 
 class GPCalculator:
@@ -94,24 +96,49 @@ class GPCalculator:
             print("Sampling (MCMC)...")
             #n_samples = kwargs.get('n_samples',2000)
             #thinning = kwargs.get('thinning',40)
+           
+            #Change to nautilus here?
+            sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=False)
             
+            parameters = {'logl': {'prior': [-3,3],
+                                'latex': '\log l'},
+                          'logsigma': {'prior': [-3,3],
+                                    'latex': '\log \sigma'}}
+
+            def likelihood(params):
+
+                pars = [p for p in params.values()]
+
+                logl = self._log_marginal_likelihood_pure(pars)
+
+                return logl
+
+            info['sample'] = sampler.run(parameters,likelihood)
+            samples = np.exp(info['sample'].samples[::thinning])
+
+            p = info['sample'].getParams()
+            info['sample'].addDerived(np.exp(p.logl), name="l", label="l")
+            info['sample'].addDerived(np.exp(p.logsigma), name="sigma", label="\sigma")
+
             # Simplified MCMC call
-            def log_post(p): return self._log_marginal_likelihood_pure(p) - 0.5 * jnp.sum((p/3.0)**2)
-            @jit
-            def step(state, key):
-                p, lp = state
-                k1, k2 = random.split(key)
-                prop = p + random.normal(k1, (2,)) * 0.1
-                prop_lp = log_post(prop)
-                accept = jnp.log(random.uniform(k2)) < (prop_lp - lp)
-                next_p = jnp.where(accept, prop, p)
-                return (next_p, jnp.where(accept, prop_lp, lp)), next_p
-            
-            _, chain = lax.scan(step, (jnp.zeros(2), log_post(jnp.zeros(2))), random.split(random.PRNGKey(0), n_samples))
+            #def log_post(p): return self._log_marginal_likelihood_pure(p) - 0.5 * jnp.sum((p/3.0)**2)
+            #@jit
+            #def step(state, key):
+            #    p, lp = state
+            #    k1, k2 = random.split(key)
+            #    prop = p + random.normal(k1, (2,)) * 0.1
+            #    prop_lp = log_post(prop)
+            #    accept = jnp.log(random.uniform(k2)) < (prop_lp - lp)
+            #    next_p = jnp.where(accept, prop, p)
+            #    return (next_p, jnp.where(accept, prop_lp, lp)), next_p
+            #
+            #_, chain = lax.scan(step, (jnp.zeros(2), log_post(jnp.zeros(2))), random.split(random.PRNGKey(0), n_samples))
+            #
+            #samples = jnp.exp(chain[int(n_samples*burn_in)::thinning])
 
-            samples = jnp.exp(chain[int(n_samples*burn_in)::thinning])
+            #info['sample'] = MCSamples(samples=jnp.exp(chain),names=['l','sigma'],labels=['l','\sigma'],settings={"ignore_rows": burn_in})
 
-            info['sample'] = MCSamples(samples=jnp.exp(chain),names=['l','sigma'],labels=['l','\sigma'],settings={"ignore_rows": burn_in})
+
             
             # Marginalize (Law of Total Variance)
             mu_list, cov_list = [], []
