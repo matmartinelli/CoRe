@@ -14,7 +14,7 @@ from tools.samplers_interface import SamplersInterface
 jax.config.update("jax_enable_x64", True)
 
 class GPCalculator:
-    def __init__(self,df_data,df_cov,kernel_type='RBF'):
+    def __init__(self,df_data,df_cov,kernel_type='RBF',chatty=False):
         self.x_train = jnp.array(df_data['x'].values)
         self.y_train = jnp.array(df_data['f'].values)
         self.noise_cov = jnp.array(df_cov.values)
@@ -22,6 +22,8 @@ class GPCalculator:
         self.kernel_type = kernel_type.upper()
         self.l, self.sigma = 1.0, 1.0
         self.alpha, self.L = None, None
+
+        self.chatty = chatty
 
     # --- Kernels & Likelihood ---
     def _get_kernel_pure(self, l, sigma):
@@ -73,7 +75,7 @@ class GPCalculator:
         return K_s_X @ alpha, K_ss - v.T @ v
 
     # --- User Facing Method ---
-    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50,n_samples=2000,thinning=40,burn_in=0.3):
+    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50,n_samples=2000):
         """
         method: 'MAP' for optimized params, 'Bayesian' for marginalized.
         kwargs: n_samples, burn_in, thinning for Bayesian.
@@ -84,7 +86,8 @@ class GPCalculator:
         
         # 1. Obtain Parameters
         if method.upper() == 'MAP':
-            print("Optimizing (MAP)...")
+            if self.chatty:
+                print("Optimizing (MAP)...")
             nll_g = jit(value_and_grad(lambda p: -self._log_marginal_likelihood_pure(p)))
             res = opt.minimize(lambda p: [np.array(x) for x in nll_g(p)], np.zeros(2), method='L-BFGS-B', jac=True)
             self.l, self.sigma = np.exp(res.x)
@@ -93,11 +96,8 @@ class GPCalculator:
             lml = self._log_marginal_likelihood_pure(jnp.log(jnp.array([self.l, self.sigma])))
             
         elif method.upper() == 'BAYESIAN':
-            print("Sampling (MCMC)...")
-            #n_samples = kwargs.get('n_samples',2000)
-            #thinning = kwargs.get('thinning',40)
-           
-            #Change to nautilus here?
+            if self.chatty:
+                print("Sampling (MCMC)...")
             sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=False)
             
             parameters = {'logl': {'prior': [-3,3],
@@ -114,7 +114,11 @@ class GPCalculator:
                 return logl
 
             info['sample'] = sampler.run(parameters,likelihood)
-            samples = np.exp(info['sample'].samples[::thinning])
+
+            meanpars = info['sample'].getMeans()
+            covpars  = info['sample'].getCov()
+
+            samples = np.random.multivariate_normal(meanpars,covpars,size=n_samples)
 
             p = info['sample'].getParams()
             info['sample'].addDerived(np.exp(p.logl), name="l", label="l")
@@ -143,7 +147,7 @@ class GPCalculator:
             # Marginalize (Law of Total Variance)
             mu_list, cov_list = [], []
             for s in samples:
-                m, c = self.predict_at_params(x_r, s[0], s[1], integral_start, n_int_steps)
+                m, c = self.predict_at_params(x_r, np.exp(s[0]), np.exp(s[1]), integral_start, n_int_steps)
                 mu_list.append(m); cov_list.append(c)
                 
             mu_stack, cov_stack = jnp.stack(mu_list), jnp.stack(cov_list)
