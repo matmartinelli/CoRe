@@ -61,8 +61,8 @@ for recon_key,recon_dict in info['reconstructions'].items():
         sys.exit('ONLY GP AVAILABLE FOR NOW')
 
     #3) Saving results to file
-    recon_dict['recon_means'].to_csv(info['outroot']+'_'+recon_key+'_means.txt',sep='\t',header=0)
-    recon_dict['recon_covmat'].to_csv(info['outroot']+'_'+recon_key+'_covmat.txt',sep='\t',header=0)
+    recon_dict['recon_means'].to_csv(info['outroot']+'_'+recon_key+'_means.txt',sep='\t',header=True,index=False)
+    recon_dict['recon_covmat'].to_csv(info['outroot']+'_'+recon_key+'_covmat.txt',sep='\t',header=True,index=False)
     #TODO save diagnostic and settings here
 
 
@@ -85,3 +85,14 @@ for func_key,func_sets in info['derived_functions'].items():
     sample = reconstructor.run(derived_logic,func_key,sigma_width=5)
 
     print('Function derived in {:.2f}'.format(time()-tini))
+
+    
+    derived_mean = pd.DataFrame({'x': reconstructor.x_recon})
+    indices = [sample.index[func_key+'_'+str(ind)] for ind in range(len(reconstructor.x_recon))]
+
+    derived_mean['value'] = sample.getMeans()[indices]
+    ##MMmod: TODO
+    #Do we want this error or the full covmat?
+    derived_mean['error'] = np.sqrt(sample.getVars()[indices])
+
+    derived_mean.to_csv(info['outroot']+'_derived_{}_function.txt'.format(func_key),sep='\t',header=True,index=False)

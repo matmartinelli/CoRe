@@ -18,6 +18,7 @@ class DerivedFunction:
         recon_lenghts = [len(df) for df in recon_dict.values()]
 
         self.N_recon  = recon_lenghts[0]
+        self.x_recon = [df['x'].values for df in recon_dict.values()][0]
         if not all(x==self.N_recon for x in recon_lenghts):
             ##MMmod: TODO
             # Include check on the actual x values used by the reconstruction
