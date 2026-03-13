@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.stats import chi2
 from scipy.linalg import block_diag
 
-class GPScorer:
+class Scorer:
     def __init__(self, df_reconstruction, df_joint_cov, chatty=False):
         self.x_gp = df_reconstruction['x'].values
         self.means = df_reconstruction
