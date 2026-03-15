@@ -5,10 +5,10 @@ from scipy.linalg import block_diag
 
 class Scorer:
     def __init__(self, df_reconstruction, df_joint_cov, chatty=False):
-        self.x_gp = df_reconstruction['x'].values
+        self.x = df_reconstruction['x'].values
         self.means = df_reconstruction
         self.df_joint_cov = df_joint_cov
-        self.N = len(self.x_gp)
+        self.N = len(self.x)
         self.vars = ['f', 'd1', 'd2', 'int']
         self.chatty = chatty
 
@@ -16,7 +16,7 @@ class Scorer:
     def _get_indices(self, var_name, x_targets=None):
         if x_targets is None:
             return [f"{var_name}_{i}" for i in range(self.N)]
-        pos = [np.argmin(np.abs(self.x_gp - xi)) for xi in x_targets]
+        pos = [np.argmin(np.abs(self.x - xi)) for xi in x_targets]
         return [f"{var_name}_{i}" for i in pos]
 
     def _print_formatted_report(self, title, results):
@@ -129,7 +129,7 @@ class Scorer:
             "red_chi2": float(chi2_total / total_dof),
             "p_value": 1 - chi2.cdf(chi2_total, total_dof),
             "dof": total_dof,
-            #"breakdown": breakdown #MMmod: fix breakdown!
+            #"breakdown": breakdown #MMmod: TODO fix breakdown!
         }
 
         if self.chatty:

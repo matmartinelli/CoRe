@@ -12,8 +12,6 @@ from scipy.interpolate import interp1d
 #Polynomial (and other methods) to be added and tested
 from GaussianProcess.engine import GPCalculator
 
-#MMmod: TODO
-#Generalize scorer and move it out of GP
 from tools.diagnostics import Scorer
 
 from Reconstruction.reconstructor import DerivedFunction
@@ -101,32 +99,33 @@ for recon_key,recon_dict in info['reconstructions'].items():
 all_recons = {k: v['recon_means'] for k,v in info['reconstructions'].items()}
 all_covmats = {k: v['recon_covmat'] for k,v in info['reconstructions'].items()}
 
-#Loop over the different derived functions
+#Loop over the different derived functions (if present)
 
-for func_key,func_sets in info['derived_functions'].items():
+if 'derived_functions' in info:
+    for func_key,func_sets in info['derived_functions'].items():
 
-    print('')
-    print('DERIVING {} FUNCTION'.format(func_key))
+        print('')
+        print('DERIVING {} FUNCTION'.format(func_key))
 
-    tini = time()
-    reconstructor = DerivedFunction(all_recons,all_covmats,sampler=func_sets['sampler'],run_options=func_sets['run_options'],chatty=info['chatty'])
+        tini = time()
+        reconstructor = DerivedFunction(all_recons,all_covmats,sampler=func_sets['sampler'],run_options=func_sets['run_options'],chatty=info['chatty'])
 
-    derived_logic = eval(func_sets['logic']) 
+        derived_logic = eval(func_sets['logic']) 
 
-    sample = reconstructor.run(derived_logic,func_key,sigma_width=5)
+        sample = reconstructor.run(derived_logic,func_key,sigma_width=5)
 
-    print('Function derived in {:.2f}'.format(time()-tini))
+        print('Function derived in {:.2f}'.format(time()-tini))
 
     
-    derived_mean = pd.DataFrame({'x': reconstructor.x_recon})
-    indices = [sample.index[func_key+'_'+str(ind)] for ind in range(len(reconstructor.x_recon))]
+        derived_mean = pd.DataFrame({'x': reconstructor.x_recon})
+        indices = [sample.index[func_key+'_'+str(ind)] for ind in range(len(reconstructor.x_recon))]
 
-    derived_mean['value'] = sample.getMeans()[indices]
-    ##MMmod: TODO
-    #Do we want this error or the full covmat?
-    derived_mean['error'] = np.sqrt(sample.getVars()[indices])
+        derived_mean['value'] = sample.getMeans()[indices]
+        ##MMmod: TODO
+        #Do we want this error or the full covmat?
+        derived_mean['error'] = np.sqrt(sample.getVars()[indices])
 
-    derived_mean.to_csv(info['outroot']+'_derived_{}_function.txt'.format(func_key),sep='\t',header=True,index=False)
+        derived_mean.to_csv(info['outroot']+'_derived_{}_function.txt'.format(func_key),sep='\t',header=True,index=False)
 
-    #MMmod: TODO
-    #Run diagnostic on derived
+        #MMmod: TODO
+        #Run diagnostic on derived
