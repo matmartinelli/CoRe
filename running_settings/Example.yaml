@@ -1,0 +1,70 @@
+#Output:
+
+outroot: results/test_pipeline
+chatty: True
+
+#RECONTRUCTIONiS SETTINGS
+#
+#Here you can set the specs for multiple reconstructions.
+#
+#Each reconstruction, labelled with a key, needs to contain
+#- data_path: path to the observed data
+#- covmat_path: path to related covariance matrix
+#- fiducial_path: path to dataframe containing the theoretical 
+#                 prediction for data (can be left empty)
+#- recon_method: dictionary containing name and settings of
+#                the chosen reconstruction method
+
+reconstructions:
+  fx:
+    data_path: data/fx_test_data.txt
+    covmat_path: data/fx_test_covmat.txt
+    fiducial_path: data/fx_test_fiducial.txt
+    recon_method: 
+      name: GaussianProcess
+      N: 5
+      xmin: 0.1
+      xmax: 1.8
+      kernel: RBF
+      pars_selection: MAP
+
+  gx:
+    data_path: data/gx_test_data.txt
+    covmat_path: data/gx_test_covmat.txt
+    fiducial_path: data/gx_test_fiducial.txt
+    recon_method: 
+      name: GaussianProcess
+      N: 5
+      xmin: 0.1
+      xmax: 1.8
+      kernel: RBF
+      pars_selection: MAP
+
+#DERIVED FUNCTIONS SETTINGS
+#
+#Here, you can list a set of functions to be obtained from the 
+#reconstructions above. Notice that the code assumes that the
+#different reconstructions are uncorrelated, while functions and 
+#derivatives internal to the same reconstructions have a covariance
+#
+#Important convention:
+#
+#The functions to be derived need to fed as a lambda function,
+#with the variable names build as
+#      key-of-reconstruction_order-of-function
+#where order-of-function follows the convention
+#- f: observable function
+#- d1: first derivative
+#- d2: second derivative
+#- int: integral
+
+derived_functions:
+  D:
+    sampler: Nautilus
+    run_options: poor
+    logic: 'lambda fx_f,gx_d1: gx_d1/fx_f'
+  K:
+    sampler: Nautilus
+    run_options: poor
+    logic: 'lambda fx_f,fx_d1: fx_d1/fx_f'
+
