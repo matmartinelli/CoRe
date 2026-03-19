@@ -10,7 +10,7 @@ import jax.random as random
 
 from getdist import MCSamples
 
-from tools.samplers_interface import SamplersInterface
+from utils.samplers_interface import SamplersInterface
 
 jax.config.update("jax_enable_x64", True)
 

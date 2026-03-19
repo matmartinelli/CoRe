@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import inspect
 
-from tools.samplers_interface import SamplersInterface
+from utils.samplers_interface import SamplersInterface
 
 class DerivedFunction:
     def __init__(self,recon_dict,cov_dict,sampler='Nautilus',run_options='poor',chatty=True):
