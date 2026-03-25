@@ -40,6 +40,7 @@ class CalcCosmology:
         output = {'Hubble': {'f': hubble,
                              'd1': lambda x: 3*self.params['H0']**2*Om*(1+x)**2/hubble(x),
                              'd2': hubble.derivative(n=2)},
+                  'DM': {'f': lambda x: (1+x)*results.angular_diameter_distance(x)}, #WARNING! CURVATURE!
                   'dL': {'f': lambda x: (1+x)**2*results.angular_diameter_distance(x)},
                   'growth_rate': {'f': growth}}
 
