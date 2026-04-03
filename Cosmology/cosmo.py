@@ -22,6 +22,7 @@ class CalcCosmology:
 
     def get_cosmology(self):
 
+        zdrag = 1060
         zcamb = np.logspace(-3,np.log10(max(self.zcalc)),250)
 
 
@@ -34,15 +35,18 @@ class CalcCosmology:
 
         hubble = UnivariateSpline(self.zcalc,results.hubble_parameter(self.zcalc),s=0,k=4)
         growth = UnivariateSpline(zcamb,np.flip(camb_f),s=0,k=4)
+        dL     = UnivariateSpline(self.zcalc,(1+self.zcalc)**2*results.angular_diameter_distance(self.zcalc),s=0,k=4)
 
         Om = (self.params['ombh2']+self.params['omch2']+self.params['omnuh2'])/(self.params['H0']/100)**2
 
         output = {'Hubble': {'f': hubble,
-                             'd1': lambda x: 3*self.params['H0']**2*Om*(1+x)**2/(2*hubble(x)),
+                             'd1': hubble.derivative(n=1),#lambda x: 3*self.params['H0']**2*Om*(1+x)**2/(2*hubble(x)),
                              'd2': hubble.derivative(n=2)},
                   'DM': {'f': lambda x: (1+x)*results.angular_diameter_distance(x)}, #WARNING! CURVATURE!
-                  'dL': {'f': lambda x: (1+x)**2*results.angular_diameter_distance(x)},
-                  'growth_rate': {'f': growth}}
+                  'dL': {'f': dL,
+                         'd1': dL.derivative(n=1)},
+                  'growth_rate': {'f': growth},
+                  'rd': results.sound_horizon(zdrag)}
 
         return output
 
