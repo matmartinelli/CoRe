@@ -1,18 +1,26 @@
 import numpy as np
 import pandas as pd
 import inspect
+import json
+
 
 from utils.samplers_interface import SamplersInterface
 
 class DerivedFunction:
-    def __init__(self,recon_dict,cov_dict,sampler='Nautilus',run_options='poor',chatty=True):
+    def __init__(self,recon_dict,cov_dict,method_dict,chatty=True):
         """
         recon_dict: {'name1': df_recon1, 'name2': df_recon2}
         cov_dict:   {'name1': df_cov1, 'name2': df_cov2}
         """ 
         self.recon_dict = recon_dict
         self.cov_dict   = cov_dict
-        self.sampler    = SamplersInterface(sampler=sampler,run_options=run_options,chatty=chatty)
+        if method_dict['type'] == 'sampling':
+            self.sampler = SamplersInterface(sampler=method_dict['options']['sampler'],run_options=method_dict['options']['run_options'],chatty=chatty)
+            self.run     = self.run_sampling
+        elif method_dict['type'] == 'realizations':
+            sys.exit('Not available yet')
+        else:
+            sys.exit('UNKNOWN RECONSTRUCTION TYPE: {}'.format(method_dict['type']))
         self.chatty     = chatty
 
         recon_lenghts = [len(df) for df in recon_dict.values()]
@@ -46,7 +54,7 @@ class DerivedFunction:
 
         return gp_info, needs_x, all_args
 
-    def run(self,derived_logic,derived_name,sigma_width=5):
+    def run_sampling(self,derived_logic,derived_name,sigma_width=5):
         """
         derived_logic: lambda, e.g., lambda f, d1: d1 / f
         sigma_width: How many sigmas for the prior width
@@ -84,6 +92,12 @@ class DerivedFunction:
                          for i in range(self.N_recon)}
 
         #MMmod: TODO 
+        if self.chatty:
+            print('Nautilus primary parameters:')
+            print(json.dumps(parameters, indent=4))
+            print('')
+            print('Derived parameters')
+            print(json.dumps(derived_names, indent=4))
         #Put some print here for letting the user know parameters that will be used and derived
 
         # 4. Define Likelihood with Partials
@@ -99,10 +113,15 @@ class DerivedFunction:
             reduced_cov = df_cov.loc[keep_labels, keep_labels]
 
             likeparts[recon_key] = {
-                'inv_cov': np.linalg.inv(reduced_cov.values),
+                #'inv_cov': np.linalg.inv(reduced_cov.values),
                 'labels': keep_labels,
                 'data_vec': np.array([df_recon.iloc[int(l.split('_')[1])][l.split('_')[0]] for l in keep_labels])
             }
+
+            try:
+                likeparts[recon_key]['inv_cov'] = np.linalg.inv(reduced_cov.values)
+            except:
+                likeparts[recon_key]['inv_cov'] = np.linalg.pinv(reduced_cov.values)
 
         def likelihood(param_dict):
             chi2 = 0
