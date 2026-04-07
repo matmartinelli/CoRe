@@ -19,7 +19,7 @@ class SamplersInterface:
         else:
             sys.exit('Unknown sampler: {}'.format(sampler))
 
-    def run_nautilus(self,parameters,likelihood,derived=None):
+    def run_nautilus(self,parameters,likelihood,derived=None,savefile=None):
     
         if self.run_options == 'poor':
             sets = {'num_threads': 1,
@@ -54,6 +54,8 @@ class SamplersInterface:
 
 
         nautilus_options = {k:v for k,v in sets.items() if k != 'num_threads'}
+        if savefile != None:
+            nautilus_options['filepath'] = savefile+'.hdf5'
 
         if derived == None:
             sampler = Sampler(prior,likelihood,**nautilus_options,n_dim=ndim)
