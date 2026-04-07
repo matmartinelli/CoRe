@@ -3,6 +3,8 @@ import pandas as pd
 import inspect
 import json
 
+from scipy.stats import multivariate_normal
+from getdist.gaussian_mixtures import GaussianND
 
 from utils.samplers_interface import SamplersInterface
 
@@ -18,7 +20,10 @@ class DerivedFunction:
             self.sampler = SamplersInterface(sampler=method_dict['options']['sampler'],run_options=method_dict['options']['run_options'],chatty=chatty)
             self.run     = self.run_sampling
         elif method_dict['type'] == 'realizations':
-            sys.exit('Not available yet')
+            self.realizations = self.get_realizations(method_dict['options']['Nreals'])
+            self.Nreals   = method_dict['options']['Nreals']
+            self.Nsamples = method_dict['options']['Nsamples']
+            self.run = self.run_realizations
         else:
             sys.exit('UNKNOWN RECONSTRUCTION TYPE: {}'.format(method_dict['type']))
         self.chatty     = chatty
@@ -53,6 +58,50 @@ class DerivedFunction:
             gp_info.append({'recon_key': recon_key, 'comp': component, 'full_arg': arg})
 
         return gp_info, needs_x, all_args
+
+    def get_realizations(self,Nreals):
+
+        realizations = {}
+
+        for key,cov in self.cov_dict.items():
+            mean = [self.recon_dict[key].iloc[int(col.split('_')[1])][col.split('_')[0]] for col in cov.columns]
+            realizations[key] = pd.DataFrame(multivariate_normal(mean=mean,cov=cov.values,
+                                                                 allow_singular=True).rvs(size=Nreals),
+                                             columns=cov.columns)
+
+        return realizations
+
+    def run_realizations(self,reals,derived_logic,name):
+
+
+        gp_info, needs_x, arg_order = self._get_required_params(derived_logic)
+
+        func_reals = []
+        for ind in range(self.Nreals):
+            derived_values = []
+            for i in range(self.N_recon):
+                # Build the argument list based on the lambda's original signature
+                call_args = []
+                for arg_name in arg_order:
+                    if arg_name == 'x':
+                        call_args.append(self.x_recon[i])
+                    else:
+                        recon,func_real = arg_name.split('_')
+                        call_args.append(reals[recon].iloc[ind][func_real+'_'+str(i)])
+
+                derived_values.append(derived_logic(*call_args))
+            func_reals.append(derived_values)
+
+
+        data_array = np.array(func_reals)
+        mean_func  = np.mean(data_array,axis=0)
+        cov_func   = np.cov(data_array,rowvar=False)
+
+
+        sample = GaussianND(mean_func,cov_func,is_inv_cov=False,
+                            names=[name+'_'+str(ind) for ind in range(self.N_recon)]).MCSamples(self.Nsamples)
+
+        return sample
 
     def run_sampling(self,derived_logic,derived_name,sigma_width=5):
         """
