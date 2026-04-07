@@ -56,7 +56,7 @@ class SamplersInterface:
 
         nautilus_options = {k:v for k,v in sets.items() if k != 'num_threads'}
         if self.savefile != None:
-            nautilus_options['filepath'] = savefile+'.hdf5'
+            nautilus_options['filepath'] = self.savefile+'.hdf5'
 
         if derived == None:
             sampler = Sampler(prior,likelihood,**nautilus_options,n_dim=ndim)
