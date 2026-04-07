@@ -15,7 +15,7 @@ from utils.samplers_interface import SamplersInterface
 jax.config.update("jax_enable_x64", True)
 
 class GPCalculator:
-    def __init__(self,df_data,df_cov,kernel_type='RBF',chatty=False):
+    def __init__(self,df_data,df_cov,kernel_type='RBF',chatty=False,savefile=None):
         self.x_train = jnp.array(df_data['x'].values)
         self.y_train = jnp.array(df_data['f'].values)
         self.noise_cov = jnp.array(df_cov.values)
@@ -24,7 +24,8 @@ class GPCalculator:
         self.l, self.sigma = 1.0, 1.0
         self.alpha, self.L = None, None
 
-        self.chatty = chatty
+        self.chatty   = chatty
+        self.savefile = savefile
 
     # --- Kernels & Likelihood ---
     def _get_kernel_pure(self, l, sigma):
@@ -99,7 +100,7 @@ class GPCalculator:
         elif method.upper() == 'BAYESIAN':
             if self.chatty:
                 print("Sampling (MCMC)...")
-            sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=self.chatty)
+            sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=self.chatty,savefile=self.savefile)
             
             parameters = {'logl': {'prior': [-3,3],
                                    'latex': r'$\log l$'},
