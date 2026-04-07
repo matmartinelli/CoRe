@@ -10,7 +10,7 @@ import jax.random as random
 
 from getdist import MCSamples
 
-from tools.samplers_interface import SamplersInterface
+from utils.samplers_interface import SamplersInterface
 
 jax.config.update("jax_enable_x64", True)
 
@@ -99,12 +99,12 @@ class GPCalculator:
         elif method.upper() == 'BAYESIAN':
             if self.chatty:
                 print("Sampling (MCMC)...")
-            sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=False)
+            sampler = SamplersInterface(sampler='Nautilus',run_options='poor',chatty=self.chatty)
             
             parameters = {'logl': {'prior': [-3,3],
-                                'latex': '\log l'},
+                                   'latex': r'$\log l$'},
                           'logsigma': {'prior': [-3,3],
-                                    'latex': '\log \sigma'}}
+                                       'latex': r'$\log \sigma$'}}
 
             def likelihood(params):
 

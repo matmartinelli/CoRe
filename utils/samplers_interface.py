@@ -58,7 +58,7 @@ class SamplersInterface:
         if derived == None:
             sampler = Sampler(prior,likelihood,**nautilus_options,n_dim=ndim)
         else:
-            sampler = Sampler(prior,likelihood,**nautilus_options,blobs_dtype=blob_vec)
+            sampler = Sampler(prior,likelihood,**nautilus_options,n_dim=ndim,blobs_dtype=blob_vec)
 
         sampler.run(verbose=self.chatty)
 
