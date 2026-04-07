@@ -9,17 +9,18 @@ from getdist import MCSamples
 
 class SamplersInterface:
 
-    def __init__(self,sampler='Nautilus',run_options='poor',chatty=False):
+    def __init__(self,sampler='Nautilus',run_options='poor',chatty=False,savefile=None):
 
         self.run_options = run_options
         self.chatty      = chatty
+        self.savefile    = savefile
 
         if sampler == 'Nautilus':
             self.run = self.run_nautilus
         else:
             sys.exit('Unknown sampler: {}'.format(sampler))
 
-    def run_nautilus(self,parameters,likelihood,derived=None,savefile=None):
+    def run_nautilus(self,parameters,likelihood,derived=None):
     
         if self.run_options == 'poor':
             sets = {'num_threads': 1,
@@ -54,7 +55,7 @@ class SamplersInterface:
 
 
         nautilus_options = {k:v for k,v in sets.items() if k != 'num_threads'}
-        if savefile != None:
+        if self.savefile != None:
             nautilus_options['filepath'] = savefile+'.hdf5'
 
         if derived == None:
