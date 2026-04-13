@@ -130,10 +130,10 @@ class GPCalculator:
                                        chatty=self.chatty, savefile=self.savefile)
             
             # Dynamically build the parameter dictionary for the sampler
-            parameters = {'logl': {'prior': [-3, 3], 'latex': r'$\log l$'}}
+            parameters = {'logl': {'prior': [-3, 5], 'latex': r'$\log l$'}}
             for i in range(self.n_out):
                 suffix = str(i+1) if self.n_out > 1 else ""
-                parameters[f'logsigma{suffix}'] = {'prior': [-3, 3], 'latex': rf'$\log \sigma_{{{suffix}}}$'}
+                parameters[f'logsigma{suffix}'] = {'prior': [-3, 5], 'latex': rf'$\log \sigma_{{{suffix}}}$'}
             
             if self.n_out > 1:
                 parameters['atanhrho'] = {'prior': [-3, 3], 'latex': r'$\text{atanh}(\rho)$'}
