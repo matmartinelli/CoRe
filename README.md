@@ -1,10 +1,10 @@
-# CoRe: Cosmological Regressor
+# CoRe (/'koːre/) : Cosmological Regressor
 
 A modular Python framework for performing non-parametric reconstructions of cosmological functions and propagating those results into derived cosmological quantities. This toolkit is designed for high-performance inference, leveraging **JAX** for Gaussian Processes and **CAMB** for theoretical consistency.
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ### Folders
 * **`Cosmology/`**: 
@@ -30,23 +30,20 @@ A modular Python framework for performing non-parametric reconstructions of cosm
 
 ---
 
-## 🛠 Core Methodology
+## Reconstruction Methodology
 
 ### Gaussian Process Reconstruction
-The toolkit uses Gaussian Processes (GP) to reconstruct functions without assuming a rigid parametric form. The `GPCalculator` provides:
+The code contains a JAX based Gaussian Processes (GP) method to reconstruct functions without assuming a rigid parametric form. The `GPCalculator` provides:
 * **MAP (Maximum A Posteriori)** optimization for hyperparameters.
-* **Full Bayesian Inference** via nested sampling.
+* **Full Bayesian Inference** for hyperparameters via nested sampling.
 * **Derivative/Integral Reconstruction**: Specifically designed to handle cosmological data where we often measure the derivative or integral of the underlying quantity.
 
-The GP predictive mean $\mu_*$ and covariance $\Sigma_*$ are calculated as:
-
-$$\mu_* = K(X_*, X) [K(X, X) + C]^{-1} y$$
-$$\Sigma_* = K(X_*, X_*) - K(X_*, X) [K(X, X) + C]^{-1} K(X, X_*)$$
-
-where $C$ is the data covariance matrix.
+We refere the reader to the notebood `DEMO-GaussianProcess.ipynb` for a more detailed discussion of the GP formalism.
 
 ### Derived Functions
 Once a function is reconstructed (e.g., $H(z)$), the `DerivedFunction` class allows you to propagate the uncertainties into secondary quantities (e.g., the luminosity distance $d_L(z)$) through either direct sampling or realization-based methods.
+
+The code deals in a very automatized way with the reconstruction of derived functions. The notebook `DEMO-derived_reconstruction.ipynb` contains a walkthrough of the different methods that can be used.
 
 ---
 
