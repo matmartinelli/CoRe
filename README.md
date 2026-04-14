@@ -47,7 +47,7 @@ The code deals in a very automatized way with the reconstruction of derived func
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 1.  **Installation**:
     Ensure you have the required dependencies:
@@ -66,7 +66,7 @@ The code deals in a very automatized way with the reconstruction of derived func
 
 ---
 
-## 🛰 Roadmap
+## Future plans 
 * Support for additional samplers (e.g., Cobaya, emcee).
 * Integration of alternative reconstruction methods like Genetic Algorithms (GA).
 * Expanded diagnostic plots in the `Scorer` class.
