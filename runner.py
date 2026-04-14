@@ -8,13 +8,13 @@ from time import time
 
 from scipy.interpolate import interp1d
 
-#MMmod: TODO
-#Polynomial (and other methods) to be added and tested
-from GaussianProcess.engine import GPCalculator
+#Reconstructions tools
+from reconstruction_tools.GaussianProcess import GPCalculator
 
-from tools.diagnostics import Scorer
+from utils.diagnostics import Scorer
 
-from Reconstruction.reconstructor import DerivedFunction
+#Derived function reconstructor
+from derived_function.reconstructor import DerivedFunction
 
 info = read(sys.argv[1])
 
@@ -23,44 +23,44 @@ info = read(sys.argv[1])
 
 #Loop over the different reconstructions
 fiducial = {}
-for recon_key,recon_dict in info['reconstructions'].items():
+for data_key,dataset in info['datasets'].items():
 
     print('')
-    print('STARTING RECONSTRUCTION OF {} OBSERVABLE'.format(recon_key))
+    print('STARTING RECONSTRUCTION OF {} OBSERVABLE'.format(data_key))
     
     #MMmod: TODO
     #Add here settings test to stop code if needed
 
     #1) Reading data
-    recon_dict['dataset'] = pd.read_csv(recon_dict['data_path'],sep='\s+',header=0)
-    recon_dict['covmat']  = pd.read_csv(recon_dict['covmat_path'],sep='\s+',header=0)
-    if 'fiducial_path' in recon_dict and recon_dict['fiducial_path'] != None:
-        fidtable = pd.read_csv(recon_dict['fiducial_path'],sep='\s+',header=0)
-        fiducial[recon_key] = {}
+    dataset['dataset'] = pd.read_csv(dataset['data_path'],sep='\s+',header=0)
+    dataset['covmat']  = pd.read_csv(dataset['covmat_path'],sep='\s+',header=0)
+    if 'fiducial_path' in dataset and dataset['fiducial_path'] != None:
+        fidtable = pd.read_csv(dataset['fiducial_path'],sep='\s+',header=0)
+        fiducial[data_key] = {}
         for col in fidtable.columns:
             if col != 'x':
-                fiducial[recon_key][col] = interp1d(fidtable['x'],fidtable[col])
+                fiducial[data_key][col] = interp1d(fidtable['x'],fidtable[col])
 
 
 
     #2) Perform reconstruction
-    if recon_dict['recon_method']['name'] == 'GaussianProcess':
-        gp = GPCalculator(recon_dict['dataset'],recon_dict['covmat'],kernel_type=recon_dict['recon_method']['kernel'])
+    if info['reconstruction_settings']['name'] == 'GaussianProcess':
+        gp = GPCalculator(dataset['dataset'],dataset['covmat'],kernel_type=info['reconstruction_settings']['kernel'])
 
-        N    = recon_dict['recon_method']['N']
-        xmin = recon_dict['recon_method']['xmin']
-        xmax = recon_dict['recon_method']['xmax']
+        N    = info['reconstruction_settings']['N']
+        xmin = info['reconstruction_settings']['xmin']
+        xmax = info['reconstruction_settings']['xmax']
         x_recon = np.linspace(xmin,xmax,N)
-        kwargs = {'method': recon_dict['recon_method']['pars_selection']}
-        if 'n_samples' in recon_dict['recon_method']:
-            kwargs['n_samples'] = recon_dict['recon_method']['n_samples']
+        kwargs = {'method': info['reconstruction_settings']['pars_selection']}
+        if 'n_samples' in info['reconstruction_settings']:
+            kwargs['n_samples'] = info['reconstruction_settings']['n_samples']
         else:
             kwargs['n_samples'] = 100
 
         tini = time()
         means, joint_cov, lml, gpinfo = gp.reconstruct(x_recon,**kwargs)
-        recon_dict['recon_means']  = means
-        recon_dict['recon_covmat'] = joint_cov
+        dataset['recon_means']  = means
+        dataset['recon_covmat'] = joint_cov
 
         if info['chatty']:
             print('GP done in {:.2f} s'.format(time()-tini))
@@ -69,10 +69,10 @@ for recon_key,recon_dict in info['reconstructions'].items():
     else:
         sys.exit('ONLY GP AVAILABLE FOR NOW')
 
-    scorer = Scorer(recon_dict['recon_means'],recon_dict['recon_covmat'],chatty=info['chatty'])
+    scorer = Scorer(dataset['recon_means'],dataset['recon_covmat'],chatty=info['chatty'])
 
-    if recon_key in fiducial:
-        theory_df = pd.DataFrame({'x': x_recon}|{func: interp(x_recon) for func,interp in fiducial[recon_key].items()})
+    if data_key in fiducial:
+        theory_df = pd.DataFrame({'x': x_recon}|{func: interp(x_recon) for func,interp in fiducial[data_key].items()})
         res         = scorer.score_against_theory(theory_df)
 
         #df['Mahalanobis score'] = res['red_chi2']
@@ -82,22 +82,22 @@ for recon_key,recon_dict in info['reconstructions'].items():
         #df['Diagonal score'] = res['red_chi2']
 
     datasets = [{'type': 'f',
-                 'df': recon_dict['dataset'],
-                 'cov': recon_dict['covmat']}]
+                 'df': dataset['dataset'],
+                 'cov': dataset['covmat']}]
 
     res = scorer.score_against_data(datasets)
 
     #df['Data score'] = res['red_chi2']
 
     #3) Saving results to file
-    recon_dict['recon_means'].to_csv(info['outroot']+'_'+recon_key+'_means.txt',sep='\t',header=True,index=False)
-    recon_dict['recon_covmat'].to_csv(info['outroot']+'_'+recon_key+'_covmat.txt',sep='\t',header=True,index=False)
+    dataset['recon_means'].to_csv(info['outroot']+'_'+data_key+'_means.txt',sep='\t',header=True,index=False)
+    dataset['recon_covmat'].to_csv(info['outroot']+'_'+data_key+'_covmat.txt',sep='\t',header=True,index=False)
     #TODO save diagnostic and settings here
 
 
 #4) Create dictionaries for derived functions
-all_recons = {k: v['recon_means'] for k,v in info['reconstructions'].items()}
-all_covmats = {k: v['recon_covmat'] for k,v in info['reconstructions'].items()}
+all_recons = {k: v['recon_means'] for k,v in info['datasets'].items()}
+all_covmats = {k: v['recon_covmat'] for k,v in info['datasets'].items()}
 
 #Loop over the different derived functions (if present)
 
@@ -108,11 +108,16 @@ if 'derived_functions' in info:
         print('DERIVING {} FUNCTION'.format(func_key))
 
         tini = time()
-        reconstructor = DerivedFunction(all_recons,all_covmats,sampler=func_sets['sampler'],run_options=func_sets['run_options'],chatty=info['chatty'])
+        reconstructor = DerivedFunction(all_recons,all_covmats,func_sets['method_dict'],chatty=info['chatty'])
 
         derived_logic = eval(func_sets['logic']) 
-
-        sample = reconstructor.run(derived_logic,func_key,sigma_width=5)
+        
+        if func_sets['method_dict']['type'] == 'sampling':
+            sample = reconstructor.run(derived_logic,func_key,sigma_width=5)
+        elif func_sets['method_dict']['type'] == 'realizations':
+            sample = reconstructor.run(derived_logic,func_key)
+        else:
+            sys.exit('UNKNOWN DERIVED FUNCTION METHOD: {}'.format(func_sets['method_dict']['type']))
 
         print('Function derived in {:.2f}'.format(time()-tini))
 
