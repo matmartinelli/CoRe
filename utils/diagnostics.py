@@ -9,7 +9,7 @@ class Scorer:
         self.means = df_reconstruction
         self.df_joint_cov = df_joint_cov
         self.N = len(self.x)
-        self.vars = ['f', 'd1', 'd2', 'int']
+        self.vars = [col for col in self.means.columns if col != 'x']
         self.chatty = chatty
 
     # --- Internal Helpers ---
