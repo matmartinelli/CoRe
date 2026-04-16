@@ -78,7 +78,7 @@ class Scorer:
             "red_chi2": float(chi2_total / len(R_total)),
             "p_value": 1 - chi2.cdf(chi2_total, len(R_total)),
             "dof": len(R_total),
-            #"breakdown": breakdown #MMmod: fix breakdown!
+            "breakdown": breakdown #MMmod: fix breakdown!
         }
 
         if self.chatty:
@@ -129,7 +129,7 @@ class Scorer:
             "red_chi2": float(chi2_total / total_dof),
             "p_value": 1 - chi2.cdf(chi2_total, total_dof),
             "dof": total_dof,
-            #"breakdown": breakdown #MMmod: TODO fix breakdown!
+            "breakdown": breakdown #MMmod: TODO fix breakdown!
         }
 
         if self.chatty:
