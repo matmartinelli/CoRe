@@ -69,23 +69,24 @@ for data_key,dataset in info['datasets'].items():
     else:
         sys.exit('ONLY GP AVAILABLE FOR NOW')
 
-    scorer = Scorer(dataset['recon_means'],dataset['recon_covmat'],chatty=info['chatty'])
+    if info['want_score']: 
+        scorer = Scorer(dataset['recon_means'],dataset['recon_covmat'],chatty=info['chatty'])
 
-    if data_key in fiducial:
-        theory_df = pd.DataFrame({'x': x_recon}|{func: interp(x_recon) for func,interp in fiducial[data_key].items()})
-        res         = scorer.score_against_theory(theory_df)
+        if data_key in fiducial:
+            theory_df = pd.DataFrame({'x': x_recon}|{func: interp(x_recon) for func,interp in fiducial[data_key].items()})
+            res         = scorer.score_against_theory(theory_df)
 
-        #df['Mahalanobis score'] = res['red_chi2']
+            #df['Mahalanobis score'] = res['red_chi2']
+ 
+            res = scorer.score_pointwise(theory_df)
 
-        res = scorer.score_pointwise(theory_df)
+            #df['Diagonal score'] = res['red_chi2']
 
-        #df['Diagonal score'] = res['red_chi2']
+        datasets = [{'type': 'f',
+                     'df': dataset['dataset'],
+                     'cov': dataset['covmat']}]
 
-    datasets = [{'type': 'f',
-                 'df': dataset['dataset'],
-                 'cov': dataset['covmat']}]
-
-    res = scorer.score_against_data(datasets)
+        res = scorer.score_against_data(datasets)
 
     #df['Data score'] = res['red_chi2']
 

@@ -2,6 +2,7 @@
 
 outroot: results/test_pipeline
 chatty: True
+want_score: True
 
 #DATA SETTINGS
 #
