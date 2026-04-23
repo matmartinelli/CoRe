@@ -4,7 +4,9 @@ import inspect
 import json
 import sys
 
-from scipy.stats import multivariate_normal
+from scipy.stats  import multivariate_normal
+from scipy.linalg import block_diag
+
 from getdist.gaussian_mixtures import GaussianND
 
 from utils.samplers_interface import SamplersInterface
@@ -24,9 +26,8 @@ class DerivedFunction:
                                              chatty=chatty)
             self.run = self.run_sampling
         elif method_dict['type'] == 'realizations':
-            self.Nreals   = method_dict['options']['Nreals']
             self.Nsamples = method_dict['options']['Nsamples']
-            self.realizations = self.get_realizations(self.Nreals)
+            self.sample = self.get_joint_sample()
             self.run = self.run_realizations
         else:
             sys.exit(f'UNKNOWN RECONSTRUCTION TYPE: {method_dict["type"]}')
@@ -64,62 +65,59 @@ class DerivedFunction:
 
         return gp_info, needs_x, all_args
 
-    def get_realizations(self, Nreals):
-        """Generates realizations for all GP components."""
-        realizations = {}
-        for key, cov in self.cov_dict.items():
-            def parse_col(col):
-                parts = col.split('_')
-                idx = int(parts[-1])
-                comp = "_".join(parts[:-1])
-                return comp, idx
-            
-            mean = [self.recon_dict[key].iloc[parse_col(col)[1]][parse_col(col)[0]] 
-                    for col in cov.columns]
-            
-            realizations[key] = pd.DataFrame(
-                multivariate_normal(mean=mean, cov=cov.values, allow_singular=True).rvs(size=Nreals),
-                columns=cov.columns
-            )
-        return realizations
+    def get_joint_sample(self):
+        """Generates a joint MCSamples object for all GP components."""
+
+        labelled_cov = {}
+        for data,cov in self.cov_dict.items():
+            labelled_cov[data]          = cov.copy()
+            labelled_cov[data].columns  = [data+'_'+col for col in cov.columns]
+            labelled_cov[data].index    = labelled_cov[data].columns
+
+        matrices = [cov.values for cov in labelled_cov.values()]
+
+        # 1. Create the block diagonal matrix
+        combined_array = block_diag(*matrices)
+
+        # 2. Combine the indices and columns
+        new_index = pd.Index(np.concatenate([cov.index for cov in labelled_cov.values()]))
+        new_columns = pd.Index(np.concatenate([cov.columns for cov in labelled_cov.values()]))
+
+        # 3. Reconstruct the DataFrame
+        full_matrix = pd.DataFrame(combined_array, index=new_index, columns=new_columns)
+
+        label_vec   = [col.split('_') for col in full_matrix.columns]
+        mean_vector = [self.recon_dict[lab[0]].iloc[int(lab[2])][lab[1]] for lab in label_vec]
+
+        sample = GaussianND(mean_vector,full_matrix,is_inv_cov=False,names=full_matrix.columns).MCSamples(self.Nsamples)
+
+        return sample
 
     def run_realizations(self, logic_list, name_list):
         """
-        Modified to handle a list of logic statements and compute joint correlations.
+        Handles a list of logic statements and compute joint correlations.
         """
-        all_reals = []
+
+        p = self.sample.getParams()
+        for name,func in zip(name_list,logic_list):
+            gp_info, needs_x, arg_order = self._get_required_params(func)
+            for i in range(self.N_recon):
+                call_args = []
+                for arg_name in arg_order:
+                    if arg_name == 'x':
+                        call_args.append([self.x_recon[i]]*self.Nsamples)
+                    else:
+                        recon, comp = self._split_arg(arg_name)
+                        call_args.append(getattr(p,recon+'_'+comp+'_'+str(i)))
         
-        # Pre-calculate param info for each logic
-        logics_info = [self._get_required_params(l) for l in logic_list]
+                derpar = []
+                for ind in range(self.Nsamples):
+                    final_args = [arg[ind] for arg in call_args]
+                    derpar.append(func(*final_args))
+                self.sample.addDerived(derpar,name=name+'_'+str(i))
 
-        for ind in range(self.Nreals):
-            joint_vector = []
-            for logic, (gp_info, needs_x, arg_order) in zip(logic_list, logics_info):
-                derived_vals = []
-                for i in range(self.N_recon):
-                    call_args = []
-                    for arg_name in arg_order:
-                        if arg_name == 'x':
-                            call_args.append(self.x_recon[i])
-                        else:
-                            recon, comp = self._split_arg(arg_name)
-                            call_args.append(self.realizations[recon].iloc[ind][f"{comp}_{i}"])
-                    derived_vals.append(logic(*call_args))
-                joint_vector.extend(derived_vals)
-            all_reals.append(joint_vector)
 
-        data_array = np.array(all_reals)
-        mean_func  = np.mean(data_array, axis=0)
-        cov_func   = np.cov(data_array, rowvar=False)
-
-        # Generate joint labels: [name1_0...name1_N, name2_0...name2_N]
-        all_labels = []
-        for name in name_list:
-            all_labels += [f"{name}_{i}" for i in range(self.N_recon)]
-
-        sample = GaussianND(mean_func, cov_func, is_inv_cov=False,
-                            names=all_labels).MCSamples(self.Nsamples)
-        return sample
+        return self.sample
 
     def run_sampling(self, logic_list, name_list, sigma_width=5):
         """
