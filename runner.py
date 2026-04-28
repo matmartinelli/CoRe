@@ -45,7 +45,8 @@ for data_key,dataset in info['datasets'].items():
 
     #2) Perform reconstruction
     if info['reconstruction_settings']['name'] == 'GaussianProcess':
-        gp = GPCalculator(dataset['dataset'],dataset['covmat'],kernel_type=info['reconstruction_settings']['kernel'])
+
+        gp = GPCalculator(dataset['dataset'],dataset['covmat'],kernel_type=info['reconstruction_settings']['kernel'],chatty=info['chatty'])
 
         N    = info['reconstruction_settings']['N']
         xmin = info['reconstruction_settings']['xmin']
@@ -61,6 +62,7 @@ for data_key,dataset in info['datasets'].items():
         means, joint_cov, lml, gpinfo = gp.reconstruct(x_recon,**kwargs)
         dataset['recon_means']  = means
         dataset['recon_covmat'] = joint_cov
+        dataset['recon_info']   = gpinfo
 
         if info['chatty']:
             print('GP done in {:.2f} s'.format(time()-tini))
@@ -93,6 +95,7 @@ for data_key,dataset in info['datasets'].items():
     #3) Saving results to file
     dataset['recon_means'].to_csv(info['outroot']+'_'+data_key+'_means.txt',sep='\t',header=True,index=False)
     dataset['recon_covmat'].to_csv(info['outroot']+'_'+data_key+'_covmat.txt',sep='\t',header=True,index=False)
+    np.save(info['outroot']+'_'+data_key+'_info.npy',dataset['recon_info'])
     #TODO save diagnostic and settings here
 
 
