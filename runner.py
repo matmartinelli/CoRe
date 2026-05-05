@@ -46,7 +46,12 @@ for data_key,dataset in info['datasets'].items():
     #2) Perform reconstruction
     if info['reconstruction_settings']['name'] == 'GaussianProcess':
 
-        gp = GPCalculator(dataset['dataset'],dataset['covmat'],kernel_type=info['reconstruction_settings']['kernel'],chatty=info['chatty'])
+        if 'max_points' in dataset:
+            max_points = dataset['max_points']
+        else:
+            max_points = None
+
+        gp = GPCalculator(dataset['dataset'],dataset['covmat'],kernel_type=info['reconstruction_settings']['kernel'],max_points=max_points,chatty=info['chatty'])
 
         N    = info['reconstruction_settings']['N']
         xmin = info['reconstruction_settings']['xmin']
