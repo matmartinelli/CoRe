@@ -119,11 +119,17 @@ class GPCalculator:
         info = {}
         n_params = 1 + self.n_out + (1 if self.n_out > 1 else 0)
 
-        if method.upper() == 'MAP':
-            if self.chatty: print(f"Optimizing (MAP) for {self.n_out} outputs...")
+        # Helper to find MAP (Maximum A Posteriori) hyperparameters
+        def find_map():
+            if self.chatty: print(f"Optimizing (MAP) to find hyper-parameter centers...")
             nll_g = jit(value_and_grad(lambda p: -self._log_marginal_likelihood_pure(p)))
-            res = opt.minimize(lambda p: [np.array(x) for x in nll_g(p)], 
+            # Starting from zero (log-space) is a neutral start
+            res = opt.minimize(lambda p: [np.array(x) for x in nll_g(p)],
                                jnp.zeros(n_params), method='L-BFGS-B', jac=True)
+            return res
+
+        if method.upper() == 'MAP':
+            res = find_map()
             best_p = res.x
             l, sigmas = np.exp(best_p[0]), np.exp(best_p[1:1+self.n_out])
             rho = np.tanh(best_p[-1]) if self.n_out > 1 else 0.0
@@ -132,15 +138,38 @@ class GPCalculator:
             info['Best-fit'] = {'l': l, 'sigmas': sigmas, 'rho': rho}
 
         elif method.upper() == 'BAYESIAN':
-            if self.chatty: print(f"Sampling (MCMC) for {self.n_out} outputs...")
-            sampler = SamplersInterface(sampler='Nautilus', run_options='poor', 
-                                       chatty=self.chatty, savefile=self.savefile)
-            parameters = {'logl': {'prior': [-3, 5], 'latex': r'$\log l$'}}
+            # 1. First, perform MAP to determine the prior window
+            map_res = find_map()
+            map_p = map_res.x
+
+            if self.chatty:
+                print(f"MAP found at: {map_p}. Setting informative priors for sampling...")
+
+            # 2. Define Priors centered on MAP results
+            # We use a width of +/- 4 in log-space to allow the sampler to explore
+            # while staying in the relevant physical regime.
+            width = 4.0
+            parameters = {'logl': {'prior': [map_p[0] - width, map_p[0] + width], 'latex': r'$\log l$'}}
+
             for i in range(self.n_out):
                 suffix = str(i+1) if self.n_out > 1 else ""
-                parameters[f'logsigma{suffix}'] = {'prior': [-3, 5], 'latex': rf'$\log \sigma_{{{suffix}}}$'}
+                idx = 1 + i
+                parameters[f'logsigma{suffix}'] = {
+                    'prior': [map_p[idx] - width, map_p[idx] + width],
+                    'latex': rf'$\log \sigma_{{{suffix}}}$'
+                }
+
             if self.n_out > 1:
-                parameters['atanhrho'] = {'prior': [-3, 3], 'latex': r'$\text{atanh}(\rho)$'}
+                # Rho is tanh-space; we give it a broad range but center on MAP
+                parameters['atanhrho'] = {
+                    'prior': [map_p[-1] - 2.0, map_p[-1] + 2.0],
+                    'latex': r'$\text{atanh}(\rho)$'
+                }
+
+            # 3. Proceed with Bayesian Sampling
+            if self.chatty: print(f"Sampling (MCMC) for {self.n_out} outputs...")
+            sampler = SamplersInterface(sampler='Nautilus', run_options='poor',
+                                       chatty=self.chatty, savefile=self.savefile)
 
             def likelihood(param_dict):
                 p_array = [param_dict[k] for k in parameters.keys()]
@@ -149,21 +178,32 @@ class GPCalculator:
             info['sample'] = sampler.run(parameters, likelihood)
             meanpars = info['sample'].getMeans()
             covpars  = info['sample'].getCov()
-            s_samples = np.random.multivariate_normal(meanpars, covpars, size=n_samples)
+            
+            # Convert samples to jax array for vectorization
+            s_samples = jnp.array(np.random.multivariate_normal(meanpars, covpars, size=n_samples))
 
-            mu_list, cov_list = [], []
-            for s in s_samples:
-                l_s, sigmas_s = np.exp(s[0]), np.exp(s[1:1+self.n_out])
-                rho_s = np.tanh(s[-1]) if self.n_out > 1 else 0.0
-                m, c = self.predict_at_params(x_r, l_s, sigmas_s, rho_s, integral_start, n_int_steps)
-                mu_list.append(m); cov_list.append(c)
-                
-            mu_stack, cov_stack = jnp.stack(mu_list), jnp.stack(cov_list)
+            # Define a pure helper function for a single prediction
+            def single_predict(s):
+                l_s = jnp.exp(s[0])
+                sigmas_s = jnp.exp(s[1:1+self.n_out])
+                rho_s = jnp.tanh(s[-1]) if self.n_out > 1 else 0.0
+                return self.predict_at_params(x_r, l_s, sigmas_s, rho_s, integral_start, n_int_steps)
+
+            # Vectorize the helper function and JIT it for maximum performance
+            # vmap(func)(samples) will compute all predictions in a single batch
+            if self.chatty: print(f"Vectorizing predictions for {n_samples} samples...")
+            vectorized_predict = jit(vmap(single_predict))
+            
+            # Execute the batch (this is where the speedup happens)
+            mu_stack, cov_stack = vectorized_predict(s_samples)
+
+            # Calculate the final combined mean and covariance
             mu = jnp.mean(mu_stack, axis=0)
+            # Use the Law of Total Variance: E[Var] + Var(E)
             cov = jnp.mean(cov_stack, axis=0) + jnp.cov(mu_stack, rowvar=False)
-            lml = None
+            lml = None 
 
-        # 2. Unpacking and Labeling (using available_ops) 
+        # 2. Unpacking and Labeling (using available_ops)
         results = self._unpack(mu, cov, x_r)
         mean_df = pd.DataFrame({'x': np.array(x_r)})
         all_labels = []
