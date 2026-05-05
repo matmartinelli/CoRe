@@ -46,7 +46,8 @@ class CalcCosmology:
                   'dL': {'f': dL,
                          'd1': dL.derivative(n=1)},
                   'growth_rate': {'f': growth},
-                  'rd': results.sound_horizon(zdrag)}
+                  'rd': results.sound_horizon(zdrag),
+                  'results': results}
 
         return output
 
@@ -55,8 +56,12 @@ class CalcCosmology:
         new_params = deepcopy(params)
 
         if 'omegam' in params:
-            new_params['ombh2']  = 0.05*(new_params['H0']/100)**2
-            new_params['omnuh2'] = 0.0006
+            if 'omegab' in params:
+                new_params['ombh2'] = new_params.pop('omegab')*(new_params['H0']/100)**2
+            else:
+                new_params['ombh2']  = 0.05*(new_params['H0']/100)**2
+
+            new_params['omnuh2'] = params.get('omnuh2',0.0006)
             new_params['omch2']  = new_params.pop('omegam')*(new_params['H0']/100)**2-new_params['ombh2']-new_params['omnuh2']
 
         new_params['WantTransfer'] = True
