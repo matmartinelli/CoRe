@@ -26,7 +26,7 @@ class CalcCosmology:
         zcamb = np.logspace(-3,np.log10(max(self.zcalc)),250)
 
 
-        pars = camb.set_params(redshifts=zcamb,silent=True,**self.params)
+        pars = camb.set_params(redshifts=zcamb,silent=True,**self.params,dark_energy_model='ppf')
         results = camb.get_results(pars)
 
         camb_fsig8 = np.array(results.get_fsigma8())
