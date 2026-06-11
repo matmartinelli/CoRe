@@ -141,6 +141,7 @@ class GPCalculator:
             # 1. First, perform MAP to determine the prior window
             map_res = find_map()
             map_p = map_res.x
+            info['Best-fit'] = {'logl': map_p[0]}
 
             if self.chatty:
                 print(f"MAP found at: {map_p}. Setting informative priors for sampling...")
@@ -151,9 +152,11 @@ class GPCalculator:
             width = 4.0
             parameters = {'logl': {'prior': [map_p[0] - width, map_p[0] + width], 'latex': r'$\log l$'}}
 
+            info['Best-fit'] = {'logl': map_p[0]}
             for i in range(self.n_out):
                 suffix = str(i+1) if self.n_out > 1 else ""
                 idx = 1 + i
+                info['Best-fit'][f'logsigma{suffix}'] = map_p[idx]
                 parameters[f'logsigma{suffix}'] = {
                     'prior': [map_p[idx] - width, map_p[idx] + width],
                     'latex': rf'$\log \sigma_{{{suffix}}}$'
@@ -161,9 +164,10 @@ class GPCalculator:
 
             if self.n_out > 1:
                 # Rho is tanh-space; we give it a broad range but center on MAP
+                info['Best-fit']['atanhrho'] = map_p[-1]
                 parameters['atanhrho'] = {
                     'prior': [map_p[-1] - 2.0, map_p[-1] + 2.0],
-                    'latex': r'$\text{atanh}(\rho)$'
+                    'latex': r'$atanh(\rho)$'
                 }
 
             # 3. Proceed with Bayesian Sampling
