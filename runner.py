@@ -9,12 +9,12 @@ from time import time
 from scipy.interpolate import interp1d
 
 #Reconstructions tools
-from reconstruction_tools.GaussianProcess import GPCalculator
+from CoRe.reconstruction_tools.GaussianProcess import GPCalculator
 
-from utils.diagnostics import Scorer
+from CoRe.utils.diagnostics import Scorer
 
 #Derived function reconstructor
-from derived_function.reconstructor import DerivedFunction
+from CoRe.derived_function.reconstructor import DerivedFunction
 
 info = read(sys.argv[1])
 

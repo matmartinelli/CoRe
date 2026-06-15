@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from jax import grad, vmap, jit, value_and_grad
 from jax.scipy.linalg import cholesky, cho_solve
-from utils.samplers_interface import SamplersInterface
+from CoRe.utils.samplers_interface import SamplersInterface
 import sys
 
 jax.config.update("jax_enable_x64", True)

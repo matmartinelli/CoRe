@@ -9,7 +9,7 @@ from scipy.linalg import block_diag
 
 from getdist.gaussian_mixtures import GaussianND
 
-from utils.samplers_interface import SamplersInterface
+from CoRe.utils.samplers_interface import SamplersInterface
 
 class DerivedFunction:
     def __init__(self, recon_dict, cov_dict, method_dict, chatty=True):
