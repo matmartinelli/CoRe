@@ -52,6 +52,25 @@ class Scorer:
                 print(f"  - {var: <4}: {stats['chi2_contrib']:8.2f} ({stats['percentage']:5.1f}%)")
         print(f"{bold}{'='*50}{reset}\n")
 
+        if 'eigenvalues' in results:
+            print(f"{'Mode':<6} | {'Eigenvalue':<12} | {'Chi2 Contribution':<15}")
+            print("-" * 55)
+            for i in range(len(results['eigenvalues'])):
+                print(f"{i:<6} | {results['eigenvalues'][i]:<12.2e} | {results['chi2_per_mode'][i]:<15.2f}")
+
+    #---- Eigenmode breakdown ---
+    def break_eigenmodes(self,C_tot,diffvec):
+
+        eigenvalues, eigenvectors = np.linalg.eigh(C_tot)
+        diffvec_projected = eigenvectors.T @ diffvec
+
+        chi2_per_mode = (diffvec_projected**2) / eigenvalues
+        idx           = np.argsort(eigenvalues)[::-1]
+        eigenvalues   = eigenvalues[idx]
+        chi2_per_mode = chi2_per_mode[idx]
+
+        return eigenvalues,chi2_per_mode
+
     # --- Scoring Methods ---
     def score_against_theory(self, theory_df):
         active_vars = [v for v in self.vars if v in theory_df.columns if v != 'x']
@@ -65,7 +84,7 @@ class Scorer:
         cov_sub = self.df_joint_cov.loc[all_labels, all_labels].values + np.eye(len(all_labels)) * 1e-11
         inv_cov = np.linalg.pinv(cov_sub)
         chi2_total = R_total.T @ inv_cov @ R_total
-        
+
         breakdown = {}
         for i, var in enumerate(active_vars):
             r_part = all_r[i]
@@ -80,6 +99,8 @@ class Scorer:
             "dof": len(R_total),
             "breakdown": breakdown #MMmod: fix breakdown!
         }
+
+        res['eigenvalues'],res['chi2_per_mode'] = self.break_eigenmodes(cov_sub,R_total)
 
         if self.chatty:
             self._print_formatted_report("THEORY CONSISTENCY", res)
@@ -160,6 +181,9 @@ class Scorer:
             "p_value": 1 - chi2.cdf(chi2_val, len(R)),
             "dof": len(R)
         }
+
+        res['eigenvalues'],res['chi2_per_mode'] = self.break_eigenmodes(S_total,R)
+
         if self.chatty:
             self._print_formatted_report("EXTERNAL DATA VALIDATION", res)
         return res
