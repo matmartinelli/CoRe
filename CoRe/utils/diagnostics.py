@@ -4,12 +4,22 @@ from scipy.stats import chi2
 from scipy.linalg import block_diag
 
 class Scorer:
-    def __init__(self, df_reconstruction, df_joint_cov, chatty=False):
+    def __init__(self, df_reconstruction, df_joint_cov, eigen_trunc_factor=None, chatty=False):
+        """
+        Diagnostic scoring suite for CoRe reconstructions.
+        
+        df_reconstruction: pd.DataFrame containing the mean curves
+        df_joint_cov:      pd.DataFrame containing the joint covariance matrix
+        eigen_trunc_factor: float (F), if provided, truncates eigenmodes with eigenvalues 
+                            smaller than max(eigenvalues) / F.
+        chatty:             bool, toggles formatted console reporting
+        """
         self.x = df_reconstruction['x'].values
         self.means = df_reconstruction
         self.df_joint_cov = df_joint_cov
         self.N = len(self.x)
         self.vars = [col for col in self.means.columns if col != 'x']
+        self.eigen_trunc_factor = eigen_trunc_factor
         self.chatty = chatty
 
     # --- Internal Helpers ---
@@ -20,10 +30,9 @@ class Scorer:
         return [f"{var_name}_{i}" for i in pos]
 
     def _print_formatted_report(self, title, results):
-        """Prints a color-coded summary of the score."""
+        """Prints a beautifully formatted, color-coded summary with orthogonal eigenmode breakdowns."""
         p = results.get('p_value', 0.0)
         
-        # Determine Color based on p-value
         if p < 0.01:
             color = "\033[91m"  # Red
             status = "POOR (Significant Tension)"
@@ -37,42 +46,112 @@ class Scorer:
         reset = "\033[0m"
         bold = "\033[1m"
 
-        print(f"\n{bold}{'='*50}")
+        print(f"\n{bold}{'='*60}")
         print(f" SCORE REPORT: {title}")
-        print(f"{'='*50}{reset}")
-        print(f"Status: {color}{bold}{status}{reset}")
-        print(f"Total Chi2: {results.get('total_chi2', results.get('chi2', 0)):.2f}")
-        print(f"Red.  Chi2: {results.get('red_chi2', 0):.3f}")
-        print(f"P-value:    {color}{p:.4f}{reset}")
-        print(f"DOF:        {results.get('dof', 0)}")
+        print(f"{'='*60}{reset}")
+        print(f"Status (Full System): {color}{bold}{status}{reset}")
+        print(f"Full Total Chi2:      {results.get('total_chi2', results.get('chi2', 0)):.2f}")
+        print(f"Full Red.  Chi2:      {results.get('red_chi2', 0):.3f}")
+        print(f"Full P-value:         {color}{p:.4f}{reset}")
+        print(f"Full DOF:             {results.get('dof', 0)}")
         
-        if 'breakdown' in results:
-            print(f"\n{bold}Residual Breakdown:{reset}")
+        # Display Truncated Metrics if active
+        if 'truncated_chi2' in results:
+            p_trunc = results['truncated_p_value']
+            if p_trunc < 0.01:      t_color = "\033[91m"
+            elif p_trunc < 0.05:    t_color = "\033[93m"
+            else:                   t_color = "\033[92m"
+            
+            print(f"-"*60)
+            print(f"{bold}Truncated Subspace Metrics (Cutoff Factor F = {self.eigen_trunc_factor}):{reset}")
+            print(f"Truncated Chi2:       {results['truncated_chi2']:.2f}")
+            print(f"Truncated Red. Chi2:  {results['truncated_red_chi2']:.3f}")
+            print(f"Truncated P-value:    {t_color}{p_trunc:.4f}{reset}")
+            print(f"Truncated DOF:        {results['truncated_dof']} (Dropped {results['dof'] - results['truncated_dof']} noisy modes)")
+
+        if 'breakdown' in results and title == "POINTWISE THEORY CONSISTENCY":
+            print(f"\n{bold}Pointwise Component Breakdown:{reset}")
             for var, stats in results['breakdown'].items():
-                print(f"  - {var: <4}: {stats['chi2_contrib']:8.2f} ({stats['percentage']:5.1f}%)")
-        print(f"{bold}{'='*50}{reset}\n")
+                print(f"  - {var: <5}: {stats['chi2_contrib']:8.2f} ({stats['percentage']:5.1f}%)")
 
-        if 'eigenvalues' in results:
-            print(f"{'Mode':<6} | {'Eigenvalue':<12} | {'Chi2 Contribution':<15}")
-            print("-" * 55)
-            for i in range(len(results['eigenvalues'])):
-                print(f"{i:<6} | {results['eigenvalues'][i]:<12.2e} | {results['chi2_per_mode'][i]:<15.2f}")
+        if 'eigenvalues' in results and 'chi2_per_mode' in results:
+            evals = np.array(results['eigenvalues'])
+            e_chi2 = np.array(results['chi2_per_mode'])
+            total_chi2 = np.sum(e_chi2)
+            
+            print(f"\n{bold}Eigenmode Spectrum Breakdown (Sorted by Eigenvalue / Variance Descending):{reset}")
+            print(f"{'Mode ID':<9} | {'Eigenvalue (Var)':<16} | {'Chi2 Contrib':<13} | {'Percentage':<10} | {'Status':<8}")
+            print("-" * 75)
+            
+            max_display = 12
+            max_val = evals[0] if len(evals) > 0 else 1.0
+            
+            for idx in range(min(len(evals), max_display)):
+                pct = (e_chi2[idx] / total_chi2 * 100) if total_chi2 > 0 else 0.0
+                
+                # Flag if the mode was kept or dropped under truncation rules
+                if self.eigen_trunc_factor is not None:
+                    kept = evals[idx] >= (max_val * self.eigen_trunc_factor)
+                    status_str = "KEPT" if kept else "DROPPED"
+                    s_color = "\033[92m" if kept else "\033[90m"
+                else:
+                    status_str = "ACTIVE"
+                    s_color = reset
+                    
+                print(f"Mode {idx:<4} | {evals[idx]:<16.2e} | {e_chi2[idx]:<13.2f} | {pct:5.1f}%     | {s_color}{status_str}{reset}")
+                
+            if len(evals) > max_display:
+                remaining_chi2 = np.sum(e_chi2[max_display:])
+                remaining_pct = (remaining_chi2 / total_chi2 * 100) if total_chi2 > 0 else 0.0
+                print(f"Tail ({len(evals)-max_display} modes) | {'-':<16} | {remaining_chi2:<13.2f} | {remaining_pct:5.1f}%     | -")
+                
+        print(f"{bold}{'='*60}{reset}\n")
 
-    #---- Eigenmode breakdown ---
-    def break_eigenmodes(self,C_tot,diffvec):
-
+    # ---- Eigenmode Decomposer ---
+    def break_eigenmodes(self, C_tot, diffvec):
+        """
+        Decomposes correlated residuals into mutually independent principal components,
+        sorting strictly by Eigenvalue scale (variance size descending).
+        """
         eigenvalues, eigenvectors = np.linalg.eigh(C_tot)
         diffvec_projected = eigenvectors.T @ diffvec
 
         chi2_per_mode = (diffvec_projected**2) / eigenvalues
+        
+        # Sort indices by eigenvalue magnitude descending (highest variance to lowest)
         idx           = np.argsort(eigenvalues)[::-1]
         eigenvalues   = eigenvalues[idx]
         chi2_per_mode = chi2_per_mode[idx]
 
-        return eigenvalues,chi2_per_mode
+        return eigenvalues, chi2_per_mode
+
+    def _apply_truncation(self, eigenvalues, chi2_per_mode, res):
+        """Helper method to isolate truncated subspace contributions if active."""
+        if self.eigen_trunc_factor is not None and len(eigenvalues) > 0:
+            max_ev = eigenvalues[0]
+            cutoff = max_ev * self.eigen_trunc_factor
+            
+            keep_mask = eigenvalues >= cutoff
+            trunc_chi2 = float(np.sum(chi2_per_mode[keep_mask]))
+            trunc_dof = int(np.sum(keep_mask))
+            
+            # Avoid division by zero if all modes are somehow discarded
+            if trunc_dof > 0:
+                trunc_red = trunc_chi2 / trunc_dof
+                trunc_p = 1.0 - chi2.cdf(trunc_chi2, trunc_dof)
+            else:
+                trunc_red = 0.0
+                trunc_p = 1.0
+                
+            res["truncated_chi2"] = trunc_chi2
+            res["truncated_dof"] = trunc_dof
+            res["truncated_red_chi2"] = trunc_red
+            res["truncated_p_value"] = trunc_p
+        return res
 
     # --- Scoring Methods ---
     def score_against_theory(self, theory_df):
+        """Evaluates total joint consistency against a smooth analytical model utilizing full covariance information."""
         active_vars = [v for v in self.vars if v in theory_df.columns if v != 'x']
         all_r, all_labels = [], []
         
@@ -85,22 +164,18 @@ class Scorer:
         inv_cov = np.linalg.pinv(cov_sub)
         chi2_total = R_total.T @ inv_cov @ R_total
 
-        breakdown = {}
-        for i, var in enumerate(active_vars):
-            r_part = all_r[i]
-            inv_block = inv_cov[i*self.N : (i+1)*self.N, i*self.N : (i+1)*self.N]
-            comp_chi2 = r_part.T @ inv_block @ r_part
-            breakdown[var] = {"chi2_contrib": float(comp_chi2), "percentage": float(comp_chi2/chi2_total*100)}
-
         res = {
             "total_chi2": float(chi2_total),
             "red_chi2": float(chi2_total / len(R_total)),
             "p_value": 1 - chi2.cdf(chi2_total, len(R_total)),
-            "dof": len(R_total),
-            "breakdown": breakdown #MMmod: fix breakdown!
+            "dof": len(R_total)
         }
 
-        res['eigenvalues'],res['chi2_per_mode'] = self.break_eigenmodes(cov_sub,R_total)
+        # Calculate exact orthogonal decomposition matrices
+        res['eigenvalues'], res['chi2_per_mode'] = self.break_eigenmodes(cov_sub, R_total)
+        
+        # Apply truncation logic if active
+        res = self._apply_truncation(res['eigenvalues'], res['chi2_per_mode'], res)
 
         if self.chatty:
             self._print_formatted_report("THEORY CONSISTENCY", res)
@@ -112,9 +187,8 @@ class Scorer:
         This provides a 'visual-matching' score in a formal statistical format.
         """
         active_vars = [v for v in self.vars if v in theory_df.columns if v != 'x']
-        all_r_sq = [] # Stores (r/sigma)^2
+        all_r_sq = [] 
         breakdown = {}
-
         total_dof = 0
 
         for var in active_vars:
@@ -122,26 +196,19 @@ class Scorer:
             y_theory = theory_df[var].values
             labels = self._get_indices(var)
 
-            # Extract diagonal only (the pointwise variance)
             variance = np.diag(self.df_joint_cov.loc[labels, labels].values)
-
-            # (Mean - Theory)^2 / Variance
             pulls_sq = ((mu - y_theory)**2) / (variance + 1e-12)
 
             comp_chi2 = np.sum(pulls_sq)
             all_r_sq.append(pulls_sq)
 
-            # Save breakdown for this component
             breakdown[var] = {
                 "chi2_contrib": float(comp_chi2),
-                # Percentage will be calculated after total_chi2 is known
             }
             total_dof += self.N
 
-        # Calculate Global Totals
         chi2_total = np.sum([b["chi2_contrib"] for b in breakdown.values()])
 
-        # Fill in percentages now that we have the total
         for var in active_vars:
             breakdown[var]["percentage"] = (breakdown[var]["chi2_contrib"] / chi2_total * 100) if chi2_total > 0 else 0
 
@@ -150,7 +217,7 @@ class Scorer:
             "red_chi2": float(chi2_total / total_dof),
             "p_value": 1 - chi2.cdf(chi2_total, total_dof),
             "dof": total_dof,
-            "breakdown": breakdown #MMmod: TODO fix breakdown!
+            "breakdown": breakdown
         }
 
         if self.chatty:
@@ -159,13 +226,14 @@ class Scorer:
         return res
 
     def score_against_data(self, datasets):
+        """Scores the joint reconstruction directly against secondary raw data inputs."""
         all_r, gp_labels, ext_cov_list = [], [], []
         
         for ds in datasets:
             var = ds['type']
             x_ext = ds['df']['x'].values
             labels = self._get_indices(var, x_ext)
-            # Map indices correctly
+            
             mu_gp = self.means.iloc[[int(l.split('_')[1]) for l in labels]][var].values
             all_r.append(ds['df'][var].values - mu_gp)
             gp_labels.extend(labels)
@@ -176,13 +244,16 @@ class Scorer:
         chi2_val = R.T @ np.linalg.solve(S_total + np.eye(len(R))*1e-11, R)
         
         res = {
-            "chi2": float(chi2_val),
+            "total_chi2": float(chi2_val),
             "red_chi2": float(chi2_val / len(R)),
             "p_value": 1 - chi2.cdf(chi2_val, len(R)),
             "dof": len(R)
         }
 
-        res['eigenvalues'],res['chi2_per_mode'] = self.break_eigenmodes(S_total,R)
+        res['eigenvalues'], res['chi2_per_mode'] = self.break_eigenmodes(S_total, R)
+        
+        # Apply truncation logic if active
+        res = self._apply_truncation(res['eigenvalues'], res['chi2_per_mode'], res)
 
         if self.chatty:
             self._print_formatted_report("EXTERNAL DATA VALIDATION", res)
