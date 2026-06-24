@@ -7,8 +7,17 @@ A modular Python framework for performing non-parametric reconstructions of cosm
 This code is a personal, work in progress pet-project. I cannot promise frequent updates or quick replies to issues and comments, but I plan to use this code for my work so it will not be abandoned, at least as long as it aligns with my research interests.
 
 Feel free to use the code and report any bug or issues in this repository. If you use this code, please cite the first paper using it:
+[Martinelli and Sapone (2026)](https://arxiv.org/abs/2606.16844)
 ```
-test
+@article{Martinelli:2026wjp,
+    author = "Martinelli, Matteo and Sapone, Domenico",
+    title = "{The cosmic tetrarchy: four estimators breaking the assumption degeneracy in cosmological distance tensions}",
+    eprint = "2606.16844",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.CO",
+    month = "6",
+    year = "2026"
+}
 ```
 
 ---
