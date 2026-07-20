@@ -20,6 +20,8 @@ Feel free to use the code and report any bug or issues in this repository. If yo
 }
 ```
 
+The repository contains a `cosmic_tetrarchy_pack.tar.gz` where you can find the data, notebooks, and scripts used to obtain the results of the paper.
+
 ---
 
 ## Project Structure
