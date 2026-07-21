@@ -20,7 +20,7 @@ Feel free to use the code and report any bug or issues in this repository. If yo
 }
 ```
 
-The repository contains a `cosmic_tetrarchy_pack.tar.gz` where you can find the data, notebooks, and scripts used to obtain the results of the paper.
+A package containing the tools used for the analysis of this paper is [available on Zenodo](https://zenodo.org/records/21468954). It contains the data, the notebook, and the scripts used for the paper.
 
 ---
 
