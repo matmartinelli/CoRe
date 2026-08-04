@@ -11,13 +11,17 @@ Feel free to use the code and report any bug or issues in this repository. If yo
 ```
 @article{Martinelli:2026wjp,
     author = "Martinelli, Matteo and Sapone, Domenico",
-    title = "{The cosmic tetrarchy: four estimators breaking the assumption degeneracy in cosmological distance tensions}",
+    title = "{The cosmic tetrarchy: Four estimators breaking the assumption degeneracy in cosmological distance tensions}",
     eprint = "2606.16844",
     archivePrefix = "arXiv",
     primaryClass = "astro-ph.CO",
-    month = "6",
+    doi = "10.1016/j.dark.2026.102408",
+    journal = "Phys. Dark Univ.",
+    volume = "53",
+    pages = "102408",
     year = "2026"
 }
+
 ```
 
 A package containing the tools used for the analysis of this paper is [available on Zenodo](https://zenodo.org/records/21468954). It contains the data, the notebook, and the scripts used for the paper.
