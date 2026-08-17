@@ -114,7 +114,7 @@ class GPCalculator:
         v = jax.scipy.linalg.solve_triangular(L, K_cross.T, lower=True)
         return K_cross @ alpha, K_recon - v.T @ v
 
-    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50, n_samples=2000):
+    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50, n_samples=2000,width=4.):
         x_r = jnp.atleast_1d(x_r)
         info = {}
         n_params = 1 + self.n_out + (1 if self.n_out > 1 else 0)
@@ -149,7 +149,6 @@ class GPCalculator:
             # 2. Define Priors centered on MAP results
             # We use a width of +/- 4 in log-space to allow the sampler to explore
             # while staying in the relevant physical regime.
-            width = 4.0
             parameters = {'logl': {'prior': [map_p[0] - width, map_p[0] + width], 'latex': r'$\log l$'}}
 
             info['Best-fit'] = {'logl': map_p[0]}
