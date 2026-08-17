@@ -7,6 +7,9 @@ from nautilus import Sampler
 
 from getdist import MCSamples
 
+import contextlib
+import io
+
 class SamplersInterface:
 
     def __init__(self,sampler='Nautilus',run_options='poor',chatty=False,savefile=None):
@@ -80,10 +83,12 @@ class SamplersInterface:
         if self.chatty:
             print('NAUTILUS SAMPLING FINISHED')
 
-        sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
-                           ranges={par: val['prior'] for par,val in parameters.items()},
-                           names=list(nautilus_dict.keys()),
-                           labels=list(nautilus_dict.values()))
+        #This removes unwanted print from getdist
+        with contextlib.redirect_stdout(io.StringIO()):
+            sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
+                               ranges={par: val['prior'] for par,val in parameters.items()},
+                               names=list(nautilus_dict.keys()),
+                               labels=list(nautilus_dict.values()))
         
         return sample
 
