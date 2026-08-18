@@ -11,7 +11,7 @@ import sys
 jax.config.update("jax_enable_x64", True)
 
 class GPCalculator:
-    def __init__(self, df_data, df_cov, kernel_type='RBF', chatty=False, savefile=None):
+    def __init__(self,df_data,df_cov,kernel_type='RBF',chatty=False,savefile=None):
         self.x_train = jnp.array(df_data['x'].values)
         self.noise_cov = jnp.array(df_cov.values)
         self.kernel_type = kernel_type.upper()
@@ -114,7 +114,7 @@ class GPCalculator:
         v = jax.scipy.linalg.solve_triangular(L, K_cross.T, lower=True)
         return K_cross @ alpha, K_recon - v.T @ v
 
-    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50, n_samples=2000,width=4.):
+    def reconstruct(self,x_r,method='MAP',sampler_name='nautilus',sampler_options='poor',integral_start=0.0,n_int_steps=50,n_samples=2000,width=4.):
         x_r = jnp.atleast_1d(x_r)
         info = {}
         n_params = 1 + self.n_out + (1 if self.n_out > 1 else 0)
@@ -171,8 +171,8 @@ class GPCalculator:
 
             # 3. Proceed with Bayesian Sampling
             if self.chatty: print(f"Sampling (MCMC) for {self.n_out} outputs...")
-            sampler = SamplersInterface(sampler='Nautilus', run_options='poor',
-                                       chatty=self.chatty, savefile=self.savefile)
+            sampler = SamplersInterface(sampler=sampler_name,run_options=sampler_options,
+                                        chatty=self.chatty,savefile=self.savefile)
 
             def likelihood(param_dict):
                 p_array = [param_dict[k] for k in parameters.keys()]
