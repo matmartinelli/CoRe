@@ -1,0 +1,11 @@
+bios
+camb
+emcee
+getdist
+jax
+nautilus-sampler
+numpy
+pandas
+pytest
+scipy
+setuptools

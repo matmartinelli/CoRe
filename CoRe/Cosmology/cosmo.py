@@ -24,6 +24,8 @@ class CalcCosmology:
 
         zdrag = 1060
         zcamb = np.logspace(-5,np.log10(max(self.zcalc)),250)
+        if min(self.zcalc)<min(zcamb):
+            sys.exit('Requested redshift lower than calculation limit: {:.2f} < {:.2f}'.format(min(self.zcalc),min(zcamb)))
 
 
         pars = camb.set_params(redshifts=zcamb,silent=True,**self.params,dark_energy_model='ppf')
