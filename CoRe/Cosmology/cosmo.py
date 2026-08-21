@@ -12,9 +12,9 @@ import camb
 
 class CalcCosmology:
 
-    def __init__(self,params):
+    def __init__(self,params,zcalc=np.linspace(0.,5,1000)):
 
-        self.zcalc  = np.linspace(0.,5,1000)
+        self.zcalc  = zcalc
 
         self.params = self.cambify(params)
 
@@ -23,7 +23,7 @@ class CalcCosmology:
     def get_cosmology(self):
 
         zdrag = 1060
-        zcamb = np.logspace(-3,np.log10(max(self.zcalc)),250)
+        zcamb = np.logspace(-5,np.log10(max(self.zcalc)),250)
 
 
         pars = camb.set_params(redshifts=zcamb,silent=True,**self.params,dark_energy_model='ppf')
