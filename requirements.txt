@@ -1,0 +1,11 @@
+bios==0.1.2
+camb==1.6.0
+emcee==3.1.6
+getdist==1.6.4
+jax==0.4.30
+nautilus==0.5.2
+numpy==2.5.2
+pandas==1.5.3
+pytest==8.3.4
+scipy==1.18.0
+setuptools==78.1.1
