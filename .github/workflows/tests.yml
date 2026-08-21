@@ -1,0 +1,36 @@
+name: Run Tests
+
+# Trigger the workflow on pushes or pull requests to main/master branches
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Check out your repository code
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    # 2. Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    # 3. Install project and dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        pip install -e .  # Installs your package locally so pytest can import it
+
+    # 4. Execute pytest
+    - name: Run Pytest
+      run: |
+        pytest
