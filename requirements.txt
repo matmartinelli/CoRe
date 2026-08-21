@@ -3,7 +3,7 @@ camb
 emcee
 getdist
 jax
-nautilus
+nautilus-sampler
 numpy
 pandas
 pytest
