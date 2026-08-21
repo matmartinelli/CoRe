@@ -153,6 +153,16 @@ class DerivedFunction:
                               mean_val + sigma_width * sigmas[i]],
                     'latex': rf'${arg_name}_{{{i}}}$'
                 }
+        # 2.1 Prepare derived parameters
+        #TODO: this is ugly and a repetition, fix it!
+        derived = {}
+        for name,logic in zip(name_list,logic_list):
+            for i in range(self.N_recon):
+                derived[f"{name}_{i}"] = {'derived': logic,
+                                          'prior': [None,None],
+                                          'latex': rf'${name}_{{{i}}}$'}
+
+        all_parameters = parameters | derived
 
         # 3. Likelihood Preparation (includes all components across all logics)
         likeparts = {}
@@ -196,6 +206,7 @@ class DerivedFunction:
                         else:
                             call_args.append(param_dict[f"{arg_name}_{i}"])
                     all_derived_values.append(logic(*call_args))
+
                 
             return tuple([loglike] + all_derived_values)
 
@@ -204,4 +215,4 @@ class DerivedFunction:
             for i in range(self.N_recon):
                 derived_names[f"{name}_{i}"] = {'latex': rf'${name}_{{{i}}}$'}
 
-        return self.sampler.run(parameters, likelihood, derived=derived_names)
+        return self.sampler.run(all_parameters, likelihood)#, derived=derived_names)

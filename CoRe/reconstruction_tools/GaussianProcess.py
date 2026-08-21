@@ -11,7 +11,7 @@ import sys
 jax.config.update("jax_enable_x64", True)
 
 class GPCalculator:
-    def __init__(self, df_data, df_cov, kernel_type='RBF', chatty=False, savefile=None):
+    def __init__(self,df_data,df_cov,kernel_type='RBF',chatty=False,savefile=None):
         self.x_train = jnp.array(df_data['x'].values)
         self.noise_cov = jnp.array(df_cov.values)
         self.kernel_type = kernel_type.upper()
@@ -72,7 +72,8 @@ class GPCalculator:
             L = cholesky(K + self.noise_cov, lower=True)
             alpha = cho_solve((L, True), self.y_train)
             return -0.5 * jnp.dot(self.y_train, alpha) - jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * len(self.y_train) * jnp.log(2 * jnp.pi)
-        except: return -jnp.inf
+        except: 
+            return -jnp.inf
 
     def _apply_ops(self, g, x, a, n_steps):
         """Standard calculus operators, filtered by available_ops """
@@ -114,7 +115,7 @@ class GPCalculator:
         v = jax.scipy.linalg.solve_triangular(L, K_cross.T, lower=True)
         return K_cross @ alpha, K_recon - v.T @ v
 
-    def reconstruct(self, x_r, method='MAP', integral_start=0.0, n_int_steps=50, n_samples=2000,width=4.):
+    def reconstruct(self,x_r,method='MAP',sampler_name='nautilus',sampler_options='poor',integral_start=0.0,n_int_steps=50,n_samples=2000,width=4.):
         x_r = jnp.atleast_1d(x_r)
         info = {}
         n_params = 1 + self.n_out + (1 if self.n_out > 1 else 0)
@@ -147,7 +148,7 @@ class GPCalculator:
                 print(f"MAP found at: {map_p}. Setting informative priors for sampling...")
 
             # 2. Define Priors centered on MAP results
-            # We use a width of +/- 4 in log-space to allow the sampler to explore
+            # We use a width of +/- width in log-space to allow the sampler to explore
             # while staying in the relevant physical regime.
             parameters = {'logl': {'prior': [map_p[0] - width, map_p[0] + width], 'latex': r'$\log l$'}}
 
@@ -171,12 +172,15 @@ class GPCalculator:
 
             # 3. Proceed with Bayesian Sampling
             if self.chatty: print(f"Sampling (MCMC) for {self.n_out} outputs...")
-            sampler = SamplersInterface(sampler='Nautilus', run_options='poor',
-                                       chatty=self.chatty, savefile=self.savefile)
+            sampler = SamplersInterface(sampler=sampler_name,run_options=sampler_options,
+                                        chatty=self.chatty,outroot=self.savefile)
 
             def likelihood(param_dict):
                 p_array = [param_dict[k] for k in parameters.keys()]
-                return self._log_marginal_likelihood_pure(jnp.array(p_array))
+
+                loglike = self._log_marginal_likelihood_pure(jnp.array(p_array))
+
+                return loglike
 
             info['sample'] = sampler.run(parameters, likelihood)
             meanpars = info['sample'].getMeans()
