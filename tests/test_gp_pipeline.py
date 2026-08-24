@@ -109,3 +109,26 @@ def test_gp_bayesian_reconstruction_and_scoring(load_test_data, x_recon):
         warnings.warn(
             UserWarning(f"Marginal p-value detected: {p_val:.4f} (0.01 <= p_value <= 0.05)")
         )
+
+def test_gp_bayesian_emcee_start(load_test_data, x_recon):
+    """Smoke test to verify that the emcee sampler initializes and executes without a full run."""
+    dataset, covmat = load_test_data
+    gp = GPCalculator(dataset, covmat, kernel_type='RBF', chatty=False)
+
+    # Minimal samples/steps to check start-up without incurring full run overhead
+    means, joint_cov, lml, info = gp.reconstruct(
+        x_recon, 
+        method='BAYESIAN', 
+        sampler_name='emcee', 
+        sampler_options={'nwalkers': 20,        # Number of ensemble walkers (typically >= 2 * ndim)
+                         'nsteps': 10,        # Total iterations per walker
+                         'burn_in': 1,        # Steps to discard from the start
+                         'ini_width': 1.e-2,    #TODO
+                         'thin': 1},
+        n_samples=2
+    )
+
+    assert means is not None
+    assert not means.isna().values.any()
+    assert not joint_cov.isna().values.any()
+    assert info is not None
