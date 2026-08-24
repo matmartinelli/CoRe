@@ -31,6 +31,8 @@ class DerivedFunction:
             self.run = self.run_realizations
         else:
             sys.exit(f'UNKNOWN RECONSTRUCTION TYPE: {method_dict["type"]}')
+
+        self.method_dict = method_dict
             
         self.chatty = chatty
 
@@ -119,10 +121,11 @@ class DerivedFunction:
 
         return self.sample
 
-    def run_sampling(self, logic_list, name_list, sigma_width=5):
+    def run_sampling(self, logic_list, name_list):
         """
         Modified to handle a list of logic statements and compute joint correlations.
         """
+        sigma_width = self.method_dict['options']['sigma_width']
         # 1. Aggregate all required parameters from all logics
         all_gp_info = []
         logics_info = []
