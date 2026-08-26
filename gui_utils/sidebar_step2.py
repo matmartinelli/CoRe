@@ -11,6 +11,10 @@ def render_sidebar_step2():
         st.rerun()
 
     st.sidebar.markdown("---")
+    st.sidebar.markdown("**Global Diagnostic Settings**")
+    st.session_state.eigen_trunc_factor = st.sidebar.number_input("Eigenmode Truncation Factor", value=1e-12, format="%.1e", help="Eigenvalues lower than factor * max(eigenvalues) will be truncated.")
+
+    st.sidebar.markdown("---")
     st.sidebar.markdown("**Add Method to Comparison**")
     config_label = st.sidebar.text_input("Config Label", value=f"Config {len(st.session_state.recon_configs)+1}")
     method = st.sidebar.selectbox('Reconstruction method', ['Gaussian Process', 'Binned'])
@@ -32,7 +36,6 @@ def render_sidebar_step2():
         if binning_method == 'FLAT':
             st.sidebar.markdown("**Fiducial Functions (FLAT)**")
             
-            # Group selection by dataset
             for ds_name, ds_config in st.session_state.data_store.items():
                 st.sidebar.markdown(f"**Dataset: `{ds_name}`**")
                 fiducial_specs[ds_name] = {}

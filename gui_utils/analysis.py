@@ -9,6 +9,7 @@ import streamlit as st
 
 from CoRe.reconstruction_tools.Binning import BinnedCalculator
 from CoRe.reconstruction_tools.GaussianProcess import GPCalculator
+from CoRe.utils.diagnostics import Scorer
 
 EPSILON = 1.e-12
 
@@ -71,9 +72,10 @@ def run_single_reconstruction(
     y_labels: list, 
     dataset_name: str,
     outroot: str = "",
-    num_datasets: int = 1
+    num_datasets: int = 1,
+    eigen_trunc_factor: float = 1e-12
 ) -> dict:
-    """Executes a single reconstruction method and exports results to disk if outroot is specified."""
+    """Executes a single reconstruction method, calculates diagnostic scores, and exports results to disk."""
     m_type = cfg["method"]
     x_recon = np.linspace(cfg["xmin"], cfg["xmax"], cfg["N"])
 
@@ -102,6 +104,13 @@ def run_single_reconstruction(
         gp = GPCalculator(data_df, cov_df, kernel_type=cfg["kernel"], chatty=True)
         means, joint_cov, lml, info = gp.reconstruct(x_recon, method=cfg["hp_method"], **kwargs)
 
+    # Diagnostic scoring
+    # TODO: this probably messes covariance!!
+    fcols = [col for col in data_df if col != 'x' and '_err' not in col]
+    datasets_input = [{'type': func, 'df': data_df, 'cov': cov_df} for func in fcols]
+    scorer = Scorer(means, joint_cov, chatty=False, eigen_trunc_factor=eigen_trunc_factor)
+    score = scorer.score_against_data(datasets_input)
+
     # Export output files if outroot is non-empty
     if outroot and outroot.strip():
         clean_outroot = outroot.strip()
@@ -112,8 +121,10 @@ def run_single_reconstruction(
         safe_cfg_label = cfg['label'].replace(" ", "_")
         safe_ds_name = dataset_name.replace(" ", "_")
 
-        # Include dataset name in filename if multiple datasets are being analyzed
-        base_filename = f"{clean_outroot}_{safe_ds_name}_{safe_cfg_label}"
+        if num_datasets > 1:
+            base_filename = f"{clean_outroot}_{safe_ds_name}_{safe_cfg_label}"
+        else:
+            base_filename = f"{clean_outroot}_{safe_cfg_label}"
 
         means_file = f"{base_filename}_means.txt"
         covmat_file = f"{base_filename}_covmat.txt"
@@ -128,5 +139,6 @@ def run_single_reconstruction(
         'means': means,
         'covmat': joint_cov,
         'method': m_type,
-        'label': cfg['label']
+        'label': cfg['label'],
+        'score': score
     }
