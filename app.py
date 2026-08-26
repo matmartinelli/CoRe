@@ -19,6 +19,8 @@ if "data_store" not in st.session_state:
     st.session_state.data_store = {}
 if "recon_configs" not in st.session_state:
     st.session_state.recon_configs = []
+if "outroot" not in st.session_state:
+    st.session_state.outroot = ""
 
 # PAGE ROUTING
 if st.session_state.step == 1:
@@ -55,6 +57,9 @@ elif st.session_state.step == 2:
         st.warning("⚠️ Add one or more reconstruction methods in the sidebar to run the reconstruction pipeline.")
     else:
         if st.button("🚀 Run All Reconstructions & Compare", type="primary"):
+            num_datasets = len(st.session_state.data_store)
+            outroot = st.session_state.get("outroot", "")
+
             for name, config in st.session_state.data_store.items():
                 data_df  = config["data_df"]
                 cov_df   = config["cov_df"]
@@ -75,7 +80,9 @@ elif st.session_state.step == 2:
                             data_df=data_df, 
                             cov_df=cov_df, 
                             y_labels=y_labels, 
-                            dataset_name=name
+                            dataset_name=name,
+                            outroot=outroot,
+                            num_datasets=num_datasets
                         )
                         recon_dicts.append(recon_res)
 

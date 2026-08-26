@@ -52,6 +52,15 @@ def render_sidebar_step1():
                 st.rerun()
 
         st.sidebar.markdown("---")
+        st.sidebar.markdown("**Output Settings (Optional)**")
+        st.session_state.outroot = st.sidebar.text_input(
+            "Output Root Path (`outroot`)",
+            value=st.session_state.get("outroot", ""),
+            placeholder="e.g., output/run1",
+            help="Path and root name for export files. Leave empty to skip saving."
+        )
+
+        st.sidebar.markdown("---")
         if st.sidebar.button("Proceed to Reconstruction Settings ➔", type="primary"):
             st.session_state.step = 2
             st.rerun()

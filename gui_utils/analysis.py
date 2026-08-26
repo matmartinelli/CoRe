@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import time
@@ -63,8 +64,16 @@ def st_capture_output(code_placeholder, refresh_rate_sec=0.1):
         sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
-def run_single_reconstruction(cfg: dict, data_df: pd.DataFrame, cov_df: pd.DataFrame, y_labels: list, dataset_name: str) -> dict:
-    """Executes a single reconstruction method for a specific dataset."""
+def run_single_reconstruction(
+    cfg: dict, 
+    data_df: pd.DataFrame, 
+    cov_df: pd.DataFrame, 
+    y_labels: list, 
+    dataset_name: str,
+    outroot: str = "",
+    num_datasets: int = 1
+) -> dict:
+    """Executes a single reconstruction method and exports results to disk if outroot is specified."""
     m_type = cfg["method"]
     x_recon = np.linspace(cfg["xmin"], cfg["xmax"], cfg["N"])
 
@@ -73,8 +82,6 @@ def run_single_reconstruction(cfg: dict, data_df: pd.DataFrame, cov_df: pd.DataF
     if m_type == 'Binned':
         bin_engine = BinnedCalculator(data_df, cov_df, method=cfg["binning_method"])
         fid_funcs_dict = cfg.get("fiducial_funcs", {})
-        
-        # Retrieve the ordered list of functions specific to this dataset
         fid_func_input = fid_funcs_dict.get(dataset_name, None)
 
         means, cov, mask = bin_engine.reconstruct(x_recon, fiducial=fid_func_input)
@@ -94,6 +101,28 @@ def run_single_reconstruction(cfg: dict, data_df: pd.DataFrame, cov_df: pd.DataF
 
         gp = GPCalculator(data_df, cov_df, kernel_type=cfg["kernel"], chatty=True)
         means, joint_cov, lml, info = gp.reconstruct(x_recon, method=cfg["hp_method"], **kwargs)
+
+    # Export output files if outroot is non-empty
+    if outroot and outroot.strip():
+        clean_outroot = outroot.strip()
+        out_dir = os.path.dirname(clean_outroot)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
+        safe_cfg_label = cfg['label'].replace(" ", "_")
+        safe_ds_name = dataset_name.replace(" ", "_")
+
+        # Include dataset name in filename if multiple datasets are being analyzed
+        base_filename = f"{clean_outroot}_{safe_ds_name}_{safe_cfg_label}"
+
+        means_file = f"{base_filename}_means.txt"
+        covmat_file = f"{base_filename}_covmat.txt"
+
+        means.to_csv(means_file, sep=' ', index=False)
+        joint_cov.to_csv(covmat_file, sep=' ', index=True)
+
+        print(f"Saved means to: {means_file}")
+        print(f"Saved covmat to: {covmat_file}")
 
     return {
         'means': means,
