@@ -53,7 +53,7 @@ def plot_observable_recon(dataset,data_name,recon_dicts,x_label,y_labels):
     colors = [red,yellow,'purple','cyan']
     Nfuncs  = len([col for col in dataset.columns if col != 'x' and '_err' not in col])
 
-    fig, ax = plt.subplots(ncols=Nfuncs,nrows=4,sharex=True,figsize=(10,12))
+    fig, ax = plt.subplots(ncols=Nfuncs,nrows=4,sharex=True,figsize=(5*Nfuncs,12))
     if Nfuncs > 1:
         axes = ax
     else:
@@ -94,8 +94,10 @@ def plot_observable_recon(dataset,data_name,recon_dicts,x_label,y_labels):
     for i in range(Nfuncs):
         axes[-1,i].set_xlabel(x_label)
     fig.align_ylabels()
-    plt.suptitle(f"Reconstruction: {data_name}")
-    axes[0,-1].legend(**sidelegend)
+    plt.suptitle(f"Reconstruction: {data_name}",fontweight='bold',y=1.)
+    handles, labels = axes[0,0].get_legend_handles_labels()
+    fig.legend(handles,labels,loc='lower center',bbox_to_anchor=(0.5,0.92),ncol=len(labels),frameon=False)
+    fig.subplots_adjust(top=0.82)
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
