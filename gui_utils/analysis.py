@@ -63,17 +63,19 @@ def st_capture_output(code_placeholder, refresh_rate_sec=0.1):
         sys.stdout, sys.stderr = old_stdout, old_stderr
 
 
-def run_single_reconstruction(cfg: dict, data_df: pd.DataFrame, cov_df: pd.DataFrame, y_labels: list) -> dict:
-    """Executes a single reconstruction method given its configuration dictionary and dataset."""
+def run_single_reconstruction(cfg: dict, data_df: pd.DataFrame, cov_df: pd.DataFrame, y_labels: list, dataset_name: str) -> dict:
+    """Executes a single reconstruction method for a specific dataset."""
     m_type = cfg["method"]
     x_recon = np.linspace(cfg["xmin"], cfg["xmax"], cfg["N"])
 
-    print(f"\n--- Running [{cfg['label']}] ({m_type}) ---")
+    print(f"\n--- Running [{cfg['label']}] ({m_type}) on '{dataset_name}' ---")
 
     if m_type == 'Binned':
         bin_engine = BinnedCalculator(data_df, cov_df, method=cfg["binning_method"])
-        fid_funcs = cfg.get("fiducial_funcs", {})
-        fid_func_input = [fid for fid in fid_funcs.values()]
+        fid_funcs_dict = cfg.get("fiducial_funcs", {})
+        
+        # Retrieve the ordered list of functions specific to this dataset
+        fid_func_input = fid_funcs_dict.get(dataset_name, None)
 
         means, cov, mask = bin_engine.reconstruct(x_recon, fiducial=fid_func_input)
         joint_cov = pd.DataFrame(

@@ -23,13 +23,6 @@ def render_sidebar_step2():
     recon_entry["xmin"] = st.sidebar.number_input("Minimum x", value=0.1, step=0.01, format="%.2f", key=f"xmin_{config_label}")
     recon_entry["xmax"] = st.sidebar.number_input("Maximum x", value=2.0, step=0.01, format="%.2f", key=f"xmax_{config_label}")
 
-    # Extract all unique Y-labels across currently loaded datasets
-    all_y_labels = []
-    for config in st.session_state.data_store.values():
-        for y_lbl in config["y_labels"]:
-            if y_lbl not in all_y_labels:
-                all_y_labels.append(y_lbl)
-
     fiducial_specs = {}
 
     if method == 'Binned':
@@ -39,31 +32,36 @@ def render_sidebar_step2():
         if binning_method == 'FLAT':
             st.sidebar.markdown("**Fiducial Functions (FLAT)**")
             
-            for y_lbl in all_y_labels:
-                st.sidebar.caption(f"Fiducial for `{y_lbl}`:")
-                fid_type = st.sidebar.radio(
-                    f"Input type for {y_lbl}",
-                    options=["Expression", "Tabulated File"],
-                    key=f"fid_type_{config_label}_{y_lbl}",
-                    horizontal=True
-                )
+            # Group selection by dataset
+            for ds_name, ds_config in st.session_state.data_store.items():
+                st.sidebar.markdown(f"**Dataset: `{ds_name}`**")
+                fiducial_specs[ds_name] = {}
                 
-                if fid_type == "Expression":
-                    expr_str = st.sidebar.text_input(
-                        f"Expression ({y_lbl})",
-                        value="3-1*x+5*x**2-0.1*x**3",
-                        key=f"fid_expr_{config_label}_{y_lbl}",
-                        help="Enter math function in terms of 'x'."
+                for y_lbl in ds_config["y_labels"]:
+                    st.sidebar.caption(f"Fiducial for `{y_lbl}`:")
+                    fid_type = st.sidebar.radio(
+                        f"Input type for {ds_name} - {y_lbl}",
+                        options=["Expression", "Tabulated File"],
+                        key=f"fid_type_{config_label}_{ds_name}_{y_lbl}",
+                        horizontal=True
                     )
-                    fiducial_specs[y_lbl] = {"type": "expression", "val": expr_str}
-                else:
-                    tab_file = st.sidebar.file_uploader(
-                        f"Upload Tabulated ({y_lbl})",
-                        type=["txt", "csv"],
-                        key=f"fid_file_{config_label}_{y_lbl}",
-                        help="Upload file with header x,f"
-                    )
-                    fiducial_specs[y_lbl] = {"type": "file", "val": tab_file}
+                    
+                    if fid_type == "Expression":
+                        expr_str = st.sidebar.text_input(
+                            f"Expression ({y_lbl})",
+                            value="3-1*x+5*x**2-0.1*x**3",
+                            key=f"fid_expr_{config_label}_{ds_name}_{y_lbl}",
+                            help="Enter math function in terms of 'x'."
+                        )
+                        fiducial_specs[ds_name][y_lbl] = {"type": "expression", "val": expr_str}
+                    else:
+                        tab_file = st.sidebar.file_uploader(
+                            f"Upload Tabulated ({y_lbl})",
+                            type=["txt", "csv"],
+                            key=f"fid_file_{config_label}_{ds_name}_{y_lbl}",
+                            help="Upload file with header x,f"
+                        )
+                        fiducial_specs[ds_name][y_lbl] = {"type": "file", "val": tab_file}
 
     elif method == 'Gaussian Process':
         kernel = st.sidebar.selectbox('Kernel type', ['RBF', 'MATERN3/2', 'MATERN5/2'])
@@ -85,31 +83,34 @@ def render_sidebar_step2():
         fiducial_funcs = {}
 
         if method == 'Binned' and recon_entry.get("binning_method") == 'FLAT':
-            for y_lbl, spec in fiducial_specs.items():
-                if spec["type"] == "expression":
-                    try:
-                        f_test = eval(f"lambda x: {spec['val'].strip()}", {"__builtins__": None, "np": np, "numpy": np})
-                        _ = f_test(1.0)
-                        fiducial_funcs[y_lbl] = f_test
-                    except Exception as e:
-                        st.sidebar.error(f"Invalid expression for '{y_lbl}': {e}")
-                        valid = False
-                elif spec["type"] == "file":
-                    file_obj = spec["val"]
-                    if file_obj is None:
-                        st.sidebar.error(f"Please upload a tabulated file for '{y_lbl}'.")
-                        valid = False
-                    else:
+            for ds_name, ds_specs in fiducial_specs.items():
+                ds_funcs = []
+                for y_lbl, spec in ds_specs.items():
+                    if spec["type"] == "expression":
                         try:
-                            tab_df = pd.read_csv(file_obj, sep=r'\s+', header=0)
-                            x_tab = tab_df['x'].values
-                            y_tab = tab_df['f'].values
-                            
-                            interp_func = interp1d(x_tab, y_tab, kind='linear', bounds_error=False, fill_value="extrapolate")
-                            fiducial_funcs[y_lbl] = interp_func
+                            f_test = eval(f"lambda x: {spec['val'].strip()}", {"__builtins__": None, "np": np, "numpy": np})
+                            _ = f_test(1.0)
+                            ds_funcs.append(f_test)
                         except Exception as e:
-                            st.sidebar.error(f"Error reading file for '{y_lbl}': {e}")
+                            st.sidebar.error(f"Invalid expression for dataset '{ds_name}', observable '{y_lbl}': {e}")
                             valid = False
+                    elif spec["type"] == "file":
+                        file_obj = spec["val"]
+                        if file_obj is None:
+                            st.sidebar.error(f"Please upload a tabulated file for dataset '{ds_name}', observable '{y_lbl}'.")
+                            valid = False
+                        else:
+                            try:
+                                tab_df = pd.read_csv(file_obj, sep=r'\s+', header=0)
+                                x_tab = tab_df['x'].values
+                                y_tab = tab_df['f'].values
+                                
+                                interp_func = interp1d(x_tab, y_tab, kind='linear', bounds_error=False, fill_value="extrapolate")
+                                ds_funcs.append(interp_func)
+                            except Exception as e:
+                                st.sidebar.error(f"Error reading file for dataset '{ds_name}', observable '{y_lbl}': {e}")
+                                valid = False
+                fiducial_funcs[ds_name] = ds_funcs
 
             recon_entry["fiducial_funcs"] = fiducial_funcs
 

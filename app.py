@@ -5,7 +5,6 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 
 import streamlit as st
-import matplotlib.pyplot as plt
 
 from gui_utils.plots import plot_data, plot_observable_recon
 from gui_utils.sidebar_step1 import render_sidebar_step1
@@ -71,7 +70,13 @@ elif st.session_state.step == 2:
 
                 with st_capture_output(log_placeholder):
                     for cfg in st.session_state.recon_configs:
-                        recon_res = run_single_reconstruction(cfg, data_df, cov_df, y_labels)
+                        recon_res = run_single_reconstruction(
+                            cfg=cfg, 
+                            data_df=data_df, 
+                            cov_df=cov_df, 
+                            y_labels=y_labels, 
+                            dataset_name=name
+                        )
                         recon_dicts.append(recon_res)
 
                 fig_res = plot_observable_recon(data_df, name, recon_dicts, x_label, y_labels)
