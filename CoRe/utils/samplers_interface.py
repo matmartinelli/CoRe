@@ -106,13 +106,17 @@ class SamplersInterface:
 
         #TODO: create two settings
         if self.settings == 'poor':
-            sets = {'nwalkers': 32,        # Number of ensemble walkers (typically >= 2 * ndim)
-                    'nsteps': 3000,        # Total iterations per walker
-                    'burn_in': 500,        # Steps to discard from the start
+            sets = {'nwalkers': 32,
+                    'nsteps': 100,
+                    'burn_in': 10,
                     'ini_width': 1.e-2,    #TODO
-                    'thin': 5}             # Thinning factor to reduce autocorrelation
+                    'thin': 1}
         elif self.settings == 'good':
-            sys.exit('Not available yet') 
+            sets = {'nwalkers': 32,
+                    'nsteps': 3000,
+                    'burn_in': 500,
+                    'ini_width': 1.e-2,    #TODO
+                    'thin': 5} 
         elif type(self.settings) == dict:
             sets = self.settings
         else:
