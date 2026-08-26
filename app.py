@@ -80,6 +80,11 @@ elif st.session_state.step == 2:
 
                         if m_type == 'Binned':
                             bin_engine = BinnedCalculator(data_df, cov_df, method=cfg["binning_method"])
+                            fid_funcs = cfg.get("fiducial_funcs", {})
+
+                            fid_func_input = fid_funcs.get(y_labels[0], None) if len(y_labels) == 1 else fid_funcs
+
+                            bin_engine = BinnedCalculator(data_df, cov_df, method=cfg["binning_method"])
                             fid_func = cfg.get("fiducial_func", None)
                             means, cov, mask = bin_engine.reconstruct(x_recon, fiducial=fid_func)
                             joint_cov = pd.DataFrame(cov.values + np.eye(len(cov)) * epsilon, columns=cov.columns, index=cov.index)
