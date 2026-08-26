@@ -36,7 +36,7 @@ def plot_data(data_df,name,x_label,y_labels):
             fnum = str(ind+1)
         else:
             fnum = ''
-        axes[ind].errorbar(data_df['x'], data_df['f'+fnum], yerr=data_df['f'+fnum+'_err'], fmt='o', label='Data')
+        axes[ind].errorbar(data_df['x'], data_df['f'+fnum], yerr=data_df['f'+fnum+'_err'], fmt='o', label='Data',color='black')
         axes[ind].set_xlabel(x_label)
         axes[ind].set_ylabel(y_labels[ind])
         axes[ind].grid(True, linestyle="--", alpha=0.5)
@@ -50,7 +50,7 @@ def plot_data(data_df,name,x_label,y_labels):
 
 def plot_observable_recon(dataset,data_name,recon_dicts,x_label,y_labels):
 
-    colors = [red,yellow]
+    colors = [red,yellow,'purple','cyan']
     Nfuncs  = len([col for col in dataset.columns if col != 'x' and '_err' not in col])
 
     fig, ax = plt.subplots(ncols=Nfuncs,nrows=4,sharex=True,figsize=(10,12))

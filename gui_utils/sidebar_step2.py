@@ -11,17 +11,17 @@ def render_sidebar_step2():
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Evaluation Grid Settings**")
-    N = st.sidebar.number_input("Points (N)", min_value=1, max_value=200, value=15, step=1)
-    xmin = st.sidebar.number_input("Minimum x", value=0.1, step=0.01, format="%.2f")
-    xmax = st.sidebar.number_input("Maximum x", value=2.0, step=0.01, format="%.2f")
-
-    st.sidebar.markdown("---")
     st.sidebar.markdown("**Add Method to Comparison**")
     config_label = st.sidebar.text_input("Config Label", value=f"Config {len(st.session_state.recon_configs)+1}")
     method = st.sidebar.selectbox('Reconstruction method', ['Gaussian Process', 'Binned'])
 
     recon_entry = {"label": config_label, "method": method}
+
+    # Per-method Evaluation Grid Settings
+    st.sidebar.markdown("**Evaluation Grid Settings**")
+    recon_entry["N"] = st.sidebar.number_input("Points (N)", min_value=1, max_value=500, value=15, step=1, key=f"N_{config_label}")
+    recon_entry["xmin"] = st.sidebar.number_input("Minimum x", value=0.1, step=0.01, format="%.2f", key=f"xmin_{config_label}")
+    recon_entry["xmax"] = st.sidebar.number_input("Maximum x", value=2.0, step=0.01, format="%.2f", key=f"xmax_{config_label}")
 
     # Extract all unique Y-labels across currently loaded datasets
     all_y_labels = []
@@ -77,7 +77,7 @@ def render_sidebar_step2():
             recon_entry["sampler"] = sampler
             recon_entry["sampsets"] = sampsets
 
-        n_samples = st.sidebar.slider("Samples", min_value=10, max_value=500, value=100)
+        n_samples = st.sidebar.slider("Samples", min_value=10, max_value=100, value=50)
         recon_entry["n_samples"] = n_samples
 
     if st.sidebar.button("➕ Add Method"):
@@ -101,11 +101,10 @@ def render_sidebar_step2():
                         valid = False
                     else:
                         try:
-                            tab_df = pd.read_csv(file_obj, sep=r'\s+',header=0)
+                            tab_df = pd.read_csv(file_obj, sep=r'\s+', header=0)
                             x_tab = tab_df['x'].values
                             y_tab = tab_df['f'].values
                             
-                            # Linear spline interpolation with extrapolation fallback
                             interp_func = interp1d(x_tab, y_tab, kind='linear', bounds_error=False, fill_value="extrapolate")
                             fiducial_funcs[y_lbl] = interp_func
                         except Exception as e:
@@ -127,5 +126,3 @@ def render_sidebar_step2():
             if col2.button("❌", key=f"del_cfg_{idx}"):
                 st.session_state.recon_configs.pop(idx)
                 st.rerun()
-
-    return N, xmin, xmax
