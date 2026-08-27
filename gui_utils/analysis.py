@@ -107,7 +107,7 @@ def run_single_reconstruction(
     # Diagnostic scoring
     # TODO: this probably messes covariance!!
     fcols = [col for col in data_df if col != 'x' and '_err' not in col]
-    datasets_input = [{'type': func, 'df': data_df, 'cov': cov_df} for func in fcols]
+    datasets_input = [{'type': fcols, 'df': data_df, 'cov': cov_df}]
     scorer = Scorer(means, joint_cov, chatty=False, eigen_trunc_factor=eigen_trunc_factor)
     score = scorer.score_against_data(datasets_input)
 
