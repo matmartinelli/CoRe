@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 from scipy.linalg import block_diag
+from scipy.interpolate import interp1d, RegularGridInterpolator
 
 class Scorer:
     def __init__(self, df_reconstruction, df_joint_cov, eigen_trunc_factor=None, chatty=False):
@@ -225,24 +226,70 @@ class Scorer:
 
         return res
 
+
+    def _interpolate_cov_block(self, x_recon, x_ext, cov_block_recon):
+        """Interpolates a 2D covariance block from x_recon to x_ext coordinates."""
+        f_cov = RegularGridInterpolator(
+            (x_recon, x_recon),
+            cov_block_recon,
+            method='cubic',
+            bounds_error=False,
+            fill_value=None
+        )
+        X1, X2 = np.meshgrid(x_ext, x_ext, indexing='ij')
+        pts = np.array([X1.ravel(), X2.ravel()]).T
+        return f_cov(pts).reshape(len(x_ext), len(x_ext))
+
     def score_against_data(self, datasets):
-        """Scores the joint reconstruction directly against secondary raw data inputs."""
-        all_r, gp_labels, ext_cov_list = [], [], []
-        
+        """Scores the joint reconstruction directly against secondary raw data inputs
+
+        using continuous 1D/2D interpolation to eliminate x_recon grid dependence.
+        """
+        all_r, ext_cov_list = [], []
+        gp_cov_blocks = []
+
+        # Retrieve x_recon evaluation grid coordinates
+        x_recon = self.x_recon if hasattr(self, 'x_recon') else self.means['x'].values
+        n_recon = len(x_recon)
+
         for ds in datasets:
-            var = ds['type']
+            var_types = ds['type'] if isinstance(ds['type'], list) else [ds['type']]
             x_ext = ds['df']['x'].values
-            labels = self._get_indices(var, x_ext)
-            
-            mu_gp = self.means.iloc[[int(l.split('_')[1]) for l in labels]][var].values
-            all_r.append(ds['df'][var].values - mu_gp)
-            gp_labels.extend(labels)
-            ext_cov_list.append(ds['cov'].values)
-            
+            n_ext = len(x_ext)
+
+            ds_r = []
+            # Pre-allocate joint interpolated GP covariance for this dataset block
+            ds_gp_cov = np.zeros((len(var_types) * n_ext, len(var_types) * n_ext))
+
+            for i, var_i in enumerate(var_types):
+                # 1. Continuous 1D Mean Interpolation & Residuals
+                mu_recon = self.means[var_i].values
+                f_mean = interp1d(x_recon, mu_recon, kind='cubic', fill_value='extrapolate')
+                mu_gp_interp = f_mean(x_ext)
+
+                r_var = ds['df'][var_i].values - mu_gp_interp
+                ds_r.extend(r_var)
+
+                # 2. Continuous 2D Covariance Interpolation (including cross-variable blocks)
+                var_i_labels = [f"{var_i}_{k}" for k in range(n_recon)]
+
+                for j, var_j in enumerate(var_types):
+                    var_j_labels = [f"{var_j}_{k}" for k in range(n_recon)]
+
+                    cov_block_recon = self.df_joint_cov.loc[var_i_labels, var_j_labels].values
+                    cov_block_interp = self._interpolate_cov_block(x_recon, x_ext, cov_block_recon)
+
+                    # Place interpolated block into joint dataset covariance
+                    ds_gp_cov[i * n_ext : (i + 1) * n_ext, j * n_ext : (j + 1) * n_ext] = cov_block_interp
+
+            all_r.append(np.array(ds_r))
+            gp_cov_blocks.append(ds_gp_cov)
+            ext_cov_list.append(np.asarray(ds['cov'].values))
+
         R = np.concatenate(all_r)
-        S_total = self.df_joint_cov.loc[gp_labels, gp_labels].values + block_diag(*ext_cov_list)
-        chi2_val = R.T @ np.linalg.solve(S_total + np.eye(len(R))*1e-11, R)
-        
+        S_total = block_diag(*gp_cov_blocks) + block_diag(*ext_cov_list)
+        chi2_val = R.T @ np.linalg.solve(S_total + np.eye(len(R)) * 1e-11, R)
+
         res = {
             "total_chi2": float(chi2_val),
             "red_chi2": float(chi2_val / len(R)),
@@ -251,7 +298,7 @@ class Scorer:
         }
 
         res['eigenvalues'], res['chi2_per_mode'] = self.break_eigenmodes(S_total, R)
-        
+
         # Apply truncation logic if active
         res = self._apply_truncation(res['eigenvalues'], res['chi2_per_mode'], res)
 
