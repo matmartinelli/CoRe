@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import seaborn as sb
 import streamlit as st
 
 import matplotlib
@@ -43,7 +44,7 @@ def ensure_math_mode(s: str) -> str:
 
 
 def plot_data(data_df, name, x_label, y_labels):
-    fig, ax = plt.subplots(nrows=1, ncols=len(y_labels), figsize=(6, 4))
+    fig, ax = plt.subplots(nrows=len(y_labels), ncols=1, figsize=(6,4*len(y_labels)))
     axes = ax if len(y_labels) > 1 else [ax]
 
     for ind, ylabel in enumerate(y_labels):
@@ -65,12 +66,28 @@ def plot_data(data_df, name, x_label, y_labels):
     st.pyplot(fig)
     plt.close(fig)
 
+def plot_covmat(cov_df, Ndata, x_label, y_labels):
+
+    cov = cov_df.copy()
+
+    columns = {}
+    for i,ylab in enumerate(y_labels):
+        columns = columns | {'f'+str(i+1)+'_'+str(ind): ensure_math_mode(ylab+'_{'+str(ind)+'}') for ind in range(Ndata)}
+
+    cov = cov.rename(columns=columns,index=columns)
+
+    fig, ax = plt.subplots(figsize=(6,4))
+    sb.heatmap(cov,ax=ax,xticklabels=False,yticklabels=False)
+    st.pyplot(fig)
+    plt.close(fig)
+
+
 
 def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
     colors = [red, yellow, 'purple', 'cyan']
     Nfuncs = len([col for col in dataset.columns if col != 'x' and '_err' not in col])
 
-    fig, ax = plt.subplots(ncols=Nfuncs, nrows=4, sharex=True, figsize=(10, 12))
+    fig, ax = plt.subplots(ncols=Nfuncs, nrows=4, sharex=True, figsize=(5*Nfuncs, 12))
     axes = ax if Nfuncs > 1 else ax.reshape(4, 1)
 
     for j in range(Nfuncs):
@@ -143,8 +160,10 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
         axes[-1, i].set_xlabel(f"${clean_x}$")
 
     fig.align_ylabels()
-    plt.suptitle(f"Reconstruction: {data_name}")
-    axes[0, -1].legend(**sidelegend)
+    plt.suptitle(f"Reconstruction: {data_name}",y=1.)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles,labels,loc='lower center',bbox_to_anchor=(0.5, 0.9),ncol=len(labels),frameon=False)
     plt.tight_layout()
+    fig.subplots_adjust(top=0.82)
     st.pyplot(fig)
     plt.close(fig)

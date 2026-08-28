@@ -8,10 +8,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from gui_utils.plots import plot_data, plot_observable_recon
+from gui_utils.plots         import plot_data, plot_covmat, plot_observable_recon
 from gui_utils.sidebar_step1 import render_sidebar_step1
 from gui_utils.sidebar_step2 import render_sidebar_step2
-from gui_utils.analysis import st_capture_output, run_single_reconstruction
+from gui_utils.analysis      import st_capture_output, run_single_reconstruction
 
 st.set_page_config(page_title="CoRe Reconstruction Pipeline", layout="wide")
 
@@ -26,6 +26,26 @@ if "outroot" not in st.session_state:
 if "eigen_trunc_factor" not in st.session_state:
     st.session_state.eigen_trunc_factor = 1e-12
 
+
+def format_val(val):
+    if val is None:
+        return "N/A"
+    if isinstance(val, (int, np.integer)) or (isinstance(val, float) and val.is_integer()):
+        return f"{int(val)}"
+    elif isinstance(val, (float, np.floating)):
+        return f"{val:.4g}"
+    return str(val)
+
+
+def get_status_badge(p_val):
+    if p_val <= 0.01:
+        return "🔴"
+    elif p_val <= 0.05:
+        return "🟡"
+    else:
+        return "🟢"
+
+
 # PAGE ROUTING
 if st.session_state.step == 1:
     render_sidebar_step1()
@@ -37,19 +57,21 @@ if st.session_state.step == 1:
         st.info("👈 Please start by uploading at least one dataset and covariance pair using the sidebar.")
     else:
         for name, config in st.session_state.data_store.items():
-            data_df = config["data_df"]
-            x_label = config["x_label"]
+            data_df  = config["data_df"]
+            cov_df   = config["cov_df"] 
+            x_label  = config["x_label"]
             y_labels = config["y_labels"]
 
             with st.expander(f"📊 Dataset Preview: `{name}`", expanded=True):
                 col_tbl, col_plt = st.columns([1, 1])
                 with col_tbl:
-                    st.markdown("**Data Table:**")
-                    st.dataframe(data_df, use_container_width=True)
+                    st.markdown("### Raw Data Plot:")
+                    plot_data(data_df, name, x_label, y_labels)
 
                 with col_plt:
-                    st.markdown("**Raw Data Plot:**")
-                    plot_data(data_df, name, x_label, y_labels)
+                    st.markdown("### Data Covariance:")
+                    Ndata = len(data_df.index)
+                    plot_covmat(cov_df, Ndata, x_label, y_labels)
 
 elif st.session_state.step == 2:
     render_sidebar_step2()
@@ -92,54 +114,46 @@ elif st.session_state.step == 2:
                         )
                         recon_dicts.append(recon_res)
 
-                # Layout: Plot on left, Styled Diagnostic Table on right
+                # Layout: Plot on left, Markdown Diagnostic Table on right
                 col_plot, col_diag = st.columns([1.1, 1])
 
                 with col_plot:
-                    st.markdown("**Reconstruction Plot**")
+                    st.markdown("### Reconstruction Plot")
                     fig_res = plot_observable_recon(data_df, name, recon_dicts, x_label, y_labels)
 
                 with col_diag:
-                    st.markdown("**Diagnostic Scores**")
-                    formatted_scores = {}
-                    p_trunc_values = {}
+                    st.markdown("### Diagnostic Scores")
 
-                    for recon in recon_dicts:
-                        label = recon['label']
-                        s = recon.get('score', {})
+                    if recon_dicts:
+                        # Construct Markdown Table Header
+                        headers = ["Metric"] + [
+                            f"{get_status_badge(r.get('score', {}).get('truncated_p_value', 1.0))} **{r['label']}**"
+                            for r in recon_dicts
+                        ]
+                        
+                        md_lines = ["| " + " | ".join(headers) + " |"]
+                        md_lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
 
-                        dof = s.get('dof', 0)
-                        trunc_dof = s.get('truncated_dof', 0)
-                        n_cut = dof - trunc_dof
-                        p_trunc = s.get('truncated_p_value', 1.0)
+                        # Table Metrics Definitions
+                        metrics_map = [
+                            (r"$\chi^2$", lambda s: s.get('red_chi2')),
+                            (r"$p$", lambda s: s.get('p_value')),
+                            (r"$N_{\rm dof}$", lambda s: s.get('dof',0)),
+                            (r"$N_{\rm cut}$", lambda s: s.get('dof', 0) - s.get('truncated_dof', 0)),
+                            (r"$\chi^2_{\rm truncated}$", lambda s: s.get('truncated_red_chi2')),
+                            (r"$p_{\rm truncated}$", lambda s: s.get('truncated_p_value')),
+                        ]
 
-                        p_trunc_values[label] = p_trunc
+                        # Populate Markdown Rows
+                        for metric_label, metric_getter in metrics_map:
+                            row = [metric_label]
+                            for recon in recon_dicts:
+                                score = recon.get('score', {})
+                                val = metric_getter(score)
+                                row.append(format_val(val))
+                            md_lines.append("| " + " | ".join(row) + " |")
 
-                        formatted_scores[label] = {
-                            "Total chi2": s.get('red_chi2'),
-                            "p-value": s.get('p_value'),
-                            "Truncated modes": n_cut,
-                            "Truncated chi2": s.get('truncated_red_chi2'),
-                            "Truncated p-value": p_trunc
-                        }
-
-                    if formatted_scores:
-                        scores_df = pd.DataFrame(formatted_scores)
-
-                        def highlight_cols(col):
-                            p_val = p_trunc_values.get(col.name, 1.0)
-                            if p_val <= 0.01:
-                                color = 'background-color: #f8d7da; color: #721c24;'  # Red
-                            elif p_val <= 0.05:
-                                color = 'background-color: #fff3cd; color: #856404;'  # Yellow
-                            else:
-                                color = 'background-color: #d4edda; color: #155724;'  # Green
-                            return [color] * len(col)
-
-                        styled_df = scores_df.style.apply(highlight_cols, axis=0).format(
-                            lambda x: f"{int(x)}" if isinstance(x, (int, np.integer)) or (isinstance(x, float) and x.is_integer()) else (f"{x:.4g}" if isinstance(x, (float, np.floating)) else str(x))
-                        )
-
-                        st.dataframe(styled_df, use_container_width=True)
+                        md_table = "\n".join(md_lines)
+                        st.markdown(md_table)
 
             st.success("Reconstruction complete!")
