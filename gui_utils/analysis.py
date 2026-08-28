@@ -9,6 +9,7 @@ import streamlit as st
 
 from CoRe.reconstruction_tools.Binning import BinnedCalculator
 from CoRe.reconstruction_tools.GaussianProcess import GPCalculator
+from CoRe.derived_function.reconstructor import DerivedFunction
 from CoRe.utils.diagnostics import Scorer
 
 EPSILON = 1.e-12
@@ -105,7 +106,6 @@ def run_single_reconstruction(
         means, joint_cov, lml, info = gp.reconstruct(x_recon, method=cfg["hp_method"], **kwargs)
 
     # Diagnostic scoring
-    # TODO: this probably messes covariance!!
     fcols = [col for col in data_df if col != 'x' and '_err' not in col]
     datasets_input = [{'type': fcols, 'df': data_df, 'cov': cov_df}]
     scorer = Scorer(means, joint_cov, chatty=False, eigen_trunc_factor=eigen_trunc_factor)
@@ -142,3 +142,17 @@ def run_single_reconstruction(
         'label': cfg['label'],
         'score': score
     }
+
+
+def run_derived_reconstruction(
+    recon_dict: dict,
+    cov_dict: dict,
+    method_dict: dict,
+    derived_logic,
+    derived_name: str
+):
+    """Executes DerivedFunction calculation to combine reconstructions into a derived quantity."""
+    print(f"\n--- Running Derived Function Analysis for '{derived_name}' ---")
+    reconstructor = DerivedFunction(recon_dict, cov_dict, method_dict, chatty=True)
+    derived_res = reconstructor.run([derived_logic], [derived_name])
+    return derived_res

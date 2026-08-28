@@ -8,10 +8,21 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from gui_utils.plots         import plot_data, plot_covmat, plot_observable_recon
+from gui_utils.plots import (
+    plot_data, 
+    plot_covmat, 
+    plot_observable_recon,
+    plot_derived_triangle,
+    plot_derived_summary
+)
 from gui_utils.sidebar_step1 import render_sidebar_step1
 from gui_utils.sidebar_step2 import render_sidebar_step2
-from gui_utils.analysis      import st_capture_output, run_single_reconstruction
+from gui_utils.sidebar_step3 import render_sidebar_step3
+from gui_utils.analysis import (
+    st_capture_output, 
+    run_single_reconstruction, 
+    run_derived_reconstruction
+)
 
 st.set_page_config(page_title="CoRe Reconstruction Pipeline", layout="wide")
 
@@ -25,6 +36,8 @@ if "outroot" not in st.session_state:
     st.session_state.outroot = ""
 if "eigen_trunc_factor" not in st.session_state:
     st.session_state.eigen_trunc_factor = 1e-12
+if "last_recon_results" not in st.session_state:
+    st.session_state.last_recon_results = {}
 
 
 def format_val(val):
@@ -87,6 +100,8 @@ elif st.session_state.step == 2:
             outroot = st.session_state.get("outroot", "")
             factor = st.session_state.get("eigen_trunc_factor", 1e-12)
 
+            st.session_state.last_recon_results = {}
+
             for name, config in st.session_state.data_store.items():
                 data_df  = config["data_df"]
                 cov_df   = config["cov_df"]
@@ -114,7 +129,8 @@ elif st.session_state.step == 2:
                         )
                         recon_dicts.append(recon_res)
 
-                # Layout: Plot on left, Markdown Diagnostic Table on right
+                st.session_state.last_recon_results[name] = recon_dicts
+
                 col_plot, col_diag = st.columns([1.1, 1])
 
                 with col_plot:
@@ -125,7 +141,6 @@ elif st.session_state.step == 2:
                     st.markdown("### Diagnostic Scores")
 
                     if recon_dicts:
-                        # Construct Markdown Table Header
                         headers = ["Metric"] + [
                             f"{get_status_badge(r.get('score', {}).get('truncated_p_value', 1.0))} **{r['label']}**"
                             for r in recon_dicts
@@ -134,17 +149,15 @@ elif st.session_state.step == 2:
                         md_lines = ["| " + " | ".join(headers) + " |"]
                         md_lines.append("| " + " | ".join(["---"] * len(headers)) + " |")
 
-                        # Table Metrics Definitions
                         metrics_map = [
                             (r"$\chi^2$", lambda s: s.get('red_chi2')),
                             (r"$p$", lambda s: s.get('p_value')),
-                            (r"$N_{\rm dof}$", lambda s: s.get('dof',0)),
+                            (r"$N_{\rm dof}$", lambda s: s.get('dof', 0)),
                             (r"$N_{\rm cut}$", lambda s: s.get('dof', 0) - s.get('truncated_dof', 0)),
                             (r"$\chi^2_{\rm truncated}$", lambda s: s.get('truncated_red_chi2')),
                             (r"$p_{\rm truncated}$", lambda s: s.get('truncated_p_value')),
                         ]
 
-                        # Populate Markdown Rows
                         for metric_label, metric_getter in metrics_map:
                             row = [metric_label]
                             for recon in recon_dicts:
@@ -156,4 +169,107 @@ elif st.session_state.step == 2:
                         md_table = "\n".join(md_lines)
                         st.markdown(md_table)
 
+        if st.session_state.last_recon_results:
             st.success("Reconstruction complete!")
+            st.markdown("---")
+            if st.button("➡️ Proceed to Derived Quantities (Step 3)", type="primary"):
+                st.session_state.step = 3
+                st.rerun()
+
+elif st.session_state.step == 3:
+    render_sidebar_step3()
+
+    st.title("CoRe Reconstruction Pipeline")
+    st.subheader("Step 3: Combine Reconstructions for Derived Quantities")
+
+    if not st.session_state.last_recon_results or not st.session_state.recon_configs:
+        st.warning("⚠️ No reconstruction results found. Please run Step 2 reconstructions first.")
+    else:
+        num_configs = len(st.session_state.recon_configs)
+        ds_names = list(st.session_state.data_store.keys())
+        first_ds_cfg = st.session_state.recon_configs[0]
+        x_recon = np.linspace(first_ds_cfg["xmin"], first_ds_cfg["xmax"], first_ds_cfg["N"])
+        
+        first_ds_key = list(st.session_state.data_store.keys())[0]
+        x_label = st.session_state.data_store[first_ds_key].get("x_label", "x")
+
+        st.info(
+            f"Ready to compute derived quantities across **{num_configs}** reconstruction method(s) "
+            f"for dataset aliases: `{[f'D{i+1}' for i in range(len(ds_names))]}` ({', '.join(ds_names)})."
+        )
+
+        if st.button("🚀 Run Derived Function Analysis", type="primary"):
+            method_dict = st.session_state.get("derived_method_dict", {})
+            derived_name = st.session_state.get("derived_name", "derived_func")
+            logic_str = st.session_state.get("derived_logic_str", "")
+
+            try:
+                derived_logic = eval(logic_str, {"__builtins__": None, "np": np, "numpy": np})
+            except Exception as e:
+                st.error(f"Invalid derived logic syntax: {e}")
+                derived_logic = None
+
+            if derived_logic is not None:
+                all_derived_results = {}
+
+                for cfg_idx, cfg in enumerate(st.session_state.recon_configs):
+                    cfg_label = cfg["label"]
+                    st.markdown("---")
+                    st.markdown(f"### Method: `{cfg_label}` ({cfg['method']})")
+
+                    recon_dict = {}
+                    cov_dict = {}
+
+                    for ds_idx, ds_name in enumerate(ds_names, start=1):
+                        alias = f"D{ds_idx}"
+                        ds_recon = st.session_state.last_recon_results[ds_name][cfg_idx]
+
+                        recon_dict[alias] = ds_recon['means']
+                        cov_dict[alias] = ds_recon['covmat']
+                        
+                        recon_dict[ds_name] = ds_recon['means']
+                        cov_dict[ds_name] = ds_recon['covmat']
+
+                    with st.expander(f"📺 Live Logs: `{cfg_label}`", expanded=False):
+                        log_placeholder = st.empty()
+
+                    try:
+                        with st_capture_output(log_placeholder):
+                            derived_res = run_derived_reconstruction(
+                                recon_dict=recon_dict,
+                                cov_dict=cov_dict,
+                                method_dict=method_dict,
+                                derived_logic=derived_logic,
+                                derived_name=derived_name
+                            )
+
+                        all_derived_results[cfg_label] = derived_res
+                        st.success(f"Completed derived reconstruction for `{cfg_label}`!")
+
+                        if derived_res is not None:
+                            st.markdown("#### GetDist Triangle Plot")
+                            fig_tri = plot_derived_triangle(
+                                derived_res=derived_res,
+                                derived_name=derived_name,
+                                x_recon=x_recon,
+                                color=cfg.get('color', 'blue'),
+                                label=cfg_label
+                            )
+                            st.pyplot(fig_tri)
+
+                    except Exception as e:
+                        st.error(f"Error computing derived function for configuration '{cfg_label}': {e}")
+
+                st.session_state.derived_results = all_derived_results
+
+                if all_derived_results:
+                    st.markdown("---")
+                    st.markdown("## Overall Derived Function Comparison")
+                    fig_summary = plot_derived_summary(
+                        all_derived_results=all_derived_results,
+                        recon_configs=st.session_state.recon_configs,
+                        x_recon=x_recon,
+                        x_label=x_label,
+                        derived_name=derived_name
+                    )
+                    st.pyplot(fig_summary)

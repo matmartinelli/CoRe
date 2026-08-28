@@ -7,6 +7,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import rc
 
+import getdist.plots as gplots
+
 rc('text', usetex=True)
 rc('font', family='serif')
 matplotlib.rcParams.update({'font.size': 18})
@@ -167,3 +169,68 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
     fig.subplots_adjust(top=0.82)
     st.pyplot(fig)
     plt.close(fig)
+
+def plot_derived_triangle(derived_res, derived_name, x_recon, color, label):
+    """Generates GetDist triangle plot for a single reconstruction method."""
+    g = gplots.get_subplot_plotter(subplot_size=1, width_inch=12, scaling=False)
+
+    g.settings.figure_legend_frame = False
+    g.settings.axes_fontsize = 20
+    g.settings.axes_labelsize = 20
+    g.settings.legend_fontsize = 20
+    g.settings.axis_marker_color = 'black'
+    g.settings.axis_marker_ls = '--'
+    g.settings.axis_marker_lw = 1
+    g.settings.axis_tick_x_rotation = 45
+
+    g.triangle_plot(
+        [derived_res],
+        [derived_name + '_' + str(i) for i in range(len(x_recon))],
+        filled=True,
+        contour_lws=2,
+        contour_colors=[color],
+        legend_labels=[label]
+    )
+    g.fig.align_ylabels()
+    g.fig.align_xlabels()
+    return g.fig
+
+
+def plot_derived_summary(all_derived_results, recon_configs, x_recon, x_label, derived_name):
+    """Plots combined 1D summary of all derived reconstructions."""
+    fig = plt.figure()
+    color_map = {cfg['label']: cfg.get('color', 'blue') for cfg in recon_configs}
+
+    for method, sample in all_derived_results.items():
+        if sample is None:
+            continue
+
+        all_pars  = sample.getParamNames().list()
+        labels    = sample.getParamNames().labels()
+        means     = {par: val for par,val in zip(all_pars,sample.getMeans())}
+        errors    = {par: np.sqrt(val) for par,val in zip(all_pars,sample.getVars())}
+            
+        reconstruction = pd.DataFrame({'x': x_recon})
+        reconstruction['value'] = [val for par,val in means.items() if derived_name in par]
+        reconstruction['error'] = [val for par,val in errors.items() if derived_name in par]
+
+        color = color_map.get(method, 'blue')
+        plt.fill_between(
+            reconstruction['x'],
+            reconstruction['value'] + reconstruction['error'],
+            reconstruction['value'] - reconstruction['error'],
+            alpha=0.2,
+            color=color
+        )
+        plt.plot(
+            reconstruction['x'],
+            reconstruction['value'],
+            lw=2,
+            color=color,
+            label=method
+        )
+
+    plt.xlabel(x_label)
+    plt.ylabel(derived_name)
+    plt.legend(loc='best')
+    return fig
