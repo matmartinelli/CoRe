@@ -70,16 +70,17 @@ if st.session_state.step == 1:
         st.info("👈 Please start by uploading at least one dataset and covariance pair using the sidebar.")
     else:
         for name, config in st.session_state.data_store.items():
-            data_df  = config["data_df"]
-            cov_df   = config["cov_df"] 
-            x_label  = config["x_label"]
-            y_labels = config["y_labels"]
+            data_df    = config["data_df"]
+            cov_df     = config["cov_df"] 
+            x_label    = config["x_label"]
+            y_labels   = config["y_labels"]
+            data_label = config["label"]
 
-            with st.expander(f"📊 Dataset Preview: `{name}`", expanded=True):
+            with st.expander(f"📊 Dataset Preview: `{data_label}`", expanded=True):
                 col_tbl, col_plt = st.columns([1, 1])
                 with col_tbl:
                     st.markdown("### Raw Data Plot:")
-                    plot_data(data_df, name, x_label, y_labels)
+                    plot_data(data_df, data_label, x_label, y_labels)
 
                 with col_plt:
                     st.markdown("### Data Covariance:")
@@ -103,10 +104,11 @@ elif st.session_state.step == 2:
             st.session_state.last_recon_results = {}
 
             for name, config in st.session_state.data_store.items():
-                data_df  = config["data_df"]
-                cov_df   = config["cov_df"]
-                x_label  = config["x_label"]
-                y_labels = config["y_labels"]
+                data_df    = config["data_df"]
+                cov_df     = config["cov_df"]
+                x_label    = config["x_label"]
+                y_labels   = config["y_labels"]
+                data_label = config["label"]
 
                 st.markdown(f"### Comparison Results: `{name}`")
                 
@@ -135,7 +137,7 @@ elif st.session_state.step == 2:
 
                 with col_plot:
                     st.markdown("### Reconstruction Plot")
-                    fig_res = plot_observable_recon(data_df, name, recon_dicts, x_label, y_labels)
+                    fig_res = plot_observable_recon(data_df, data_label, recon_dicts, x_label, y_labels)
 
                 with col_diag:
                     st.markdown("### Diagnostic Scores")
@@ -195,7 +197,7 @@ elif st.session_state.step == 3:
 
         st.info(
             f"Ready to compute derived quantities across **{num_configs}** reconstruction method(s) "
-            f"for dataset aliases: `{[f'D{i+1}' for i in range(len(ds_names))]}` ({', '.join(ds_names)})."
+            f"for dataset names: `{ds_names}`."
         )
 
         if st.button("🚀 Run Derived Function Analysis", type="primary"):
@@ -221,12 +223,8 @@ elif st.session_state.step == 3:
                     cov_dict = {}
 
                     for ds_idx, ds_name in enumerate(ds_names, start=1):
-                        alias = f"D{ds_idx}"
                         ds_recon = st.session_state.last_recon_results[ds_name][cfg_idx]
 
-                        recon_dict[alias] = ds_recon['means']
-                        cov_dict[alias] = ds_recon['covmat']
-                        
                         recon_dict[ds_name] = ds_recon['means']
                         cov_dict[ds_name] = ds_recon['covmat']
 
@@ -235,7 +233,7 @@ elif st.session_state.step == 3:
 
                     try:
                         with st_capture_output(log_placeholder):
-                            derived_res = run_derived_reconstruction(
+                            derived_sample = run_derived_reconstruction(
                                 recon_dict=recon_dict,
                                 cov_dict=cov_dict,
                                 method_dict=method_dict,
@@ -243,13 +241,19 @@ elif st.session_state.step == 3:
                                 derived_name=derived_name
                             )
 
+                        #TODO: fix this shit!
+                        x_recon = recon_dict[list(recon_dict.keys())[0]]['x']
+
+                        derived_res = {'sample': derived_sample,
+                                       'x_recon': x_recon}
+
                         all_derived_results[cfg_label] = derived_res
                         st.success(f"Completed derived reconstruction for `{cfg_label}`!")
 
                         if derived_res is not None:
                             st.markdown("#### GetDist Triangle Plot")
                             fig_tri = plot_derived_triangle(
-                                derived_res=derived_res,
+                                derived_res=derived_sample,
                                 derived_name=derived_name,
                                 x_recon=x_recon,
                                 color=cfg.get('color', 'blue'),
@@ -268,7 +272,6 @@ elif st.session_state.step == 3:
                     fig_summary = plot_derived_summary(
                         all_derived_results=all_derived_results,
                         recon_configs=st.session_state.recon_configs,
-                        x_recon=x_recon,
                         x_label=x_label,
                         derived_name=derived_name
                     )

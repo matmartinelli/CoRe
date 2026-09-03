@@ -5,9 +5,10 @@ def render_sidebar_step1():
     st.sidebar.header("Step 1: Data Upload")
 
     with st.sidebar.form("dataset_upload_form", clear_on_submit=True):
-        dataset_name = st.text_input("Dataset Name/Label", placeholder="e.g., CC_2026")
-        data_file = st.file_uploader("Upload Dataset", type=["txt", "csv"])
-        cov_file = st.file_uploader("Upload Covariance Matrix", type=["txt", "csv"])
+        dataset_name  = st.text_input("Dataset Name", placeholder="e.g., CC_2026",help='This name will be used to refer to this dataset throughout the pipeline')
+        dataset_label = st.text_input("Dataset Label", placeholder="e.g., My favourite dataset",help='This label will be used for plots')
+        data_file     = st.file_uploader("Upload Dataset", type=["txt", "csv"])
+        cov_file      = st.file_uploader("Upload Covariance Matrix", type=["txt", "csv"])
 
         st.markdown("**Axis Configuration**")
         x_label = st.text_input("X-axis Label", value="x")
@@ -35,7 +36,8 @@ def render_sidebar_step1():
                         "data_df": data_df,
                         "cov_df": cov_df,
                         "x_label": x_label.strip(),
-                        "y_labels": parsed_y_labels
+                        "y_labels": parsed_y_labels,
+                        "label": dataset_label
                     }
                     st.sidebar.success(f"Added: '{dataset_name}'")
                     st.rerun()

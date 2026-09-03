@@ -196,12 +196,14 @@ def plot_derived_triangle(derived_res, derived_name, x_recon, color, label):
     return g.fig
 
 
-def plot_derived_summary(all_derived_results, recon_configs, x_recon, x_label, derived_name):
+def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_name):
     """Plots combined 1D summary of all derived reconstructions."""
     fig = plt.figure()
-    color_map = {cfg['label']: cfg.get('color', 'blue') for cfg in recon_configs}
+    colors = [red,yellow,'purple','black']
 
-    for method, sample in all_derived_results.items():
+    for ind,(recon_label, derived_res) in enumerate(all_derived_results.items()):
+        sample  = derived_res['sample']
+        x_recon = derived_res['x_recon']
         if sample is None:
             continue
 
@@ -209,26 +211,45 @@ def plot_derived_summary(all_derived_results, recon_configs, x_recon, x_label, d
         labels    = sample.getParamNames().labels()
         means     = {par: val for par,val in zip(all_pars,sample.getMeans())}
         errors    = {par: np.sqrt(val) for par,val in zip(all_pars,sample.getVars())}
+
+        derpars = [derived_name+'_'+str(i) for i in range(len(x_recon))]
             
         reconstruction = pd.DataFrame({'x': x_recon})
-        reconstruction['value'] = [val for par,val in means.items() if derived_name in par]
-        reconstruction['error'] = [val for par,val in errors.items() if derived_name in par]
+        reconstruction['value'] = [val for par,val in means.items() if par in derpars]
+        reconstruction['error'] = [val for par,val in errors.items() if par in derpars]
 
-        color = color_map.get(method, 'blue')
-        plt.fill_between(
-            reconstruction['x'],
-            reconstruction['value'] + reconstruction['error'],
-            reconstruction['value'] - reconstruction['error'],
-            alpha=0.2,
-            color=color
-        )
-        plt.plot(
-            reconstruction['x'],
-            reconstruction['value'],
-            lw=2,
-            color=color,
-            label=method
-        )
+        color  = colors[ind]
+        method = recon_configs[ind]["method"]
+        if method == 'Gaussian Process':
+            plt.fill_between(
+                reconstruction['x'],
+                reconstruction['value'] + reconstruction['error'],
+                reconstruction['value'] - reconstruction['error'],
+                alpha=0.2,
+                color=color
+            )
+            plt.plot(
+                reconstruction['x'],
+                reconstruction['value'],
+                lw=2,
+                color=color,
+                label=recon_label
+            )
+        elif method == 'Binned':
+            plt.errorbar(
+                         reconstruction['x'],
+                         reconstruction['value'],
+                         yerr=reconstruction['error'],
+                         ls='',
+                         color=color,
+                         alpha=1,
+                         fmt='o',
+                         ms=4,
+                         capsize=3,
+                         elinewidth=2.0,
+                         label=recon_label
+                        )
+
 
     plt.xlabel(x_label)
     plt.ylabel(derived_name)
