@@ -148,11 +148,60 @@ def run_derived_reconstruction(
     recon_dict: dict,
     cov_dict: dict,
     method_dict: dict,
-    derived_logic,
-    derived_name: str
+    derived_logics: list,
+    derived_names: list,
+    outroot: str = "",
+    cfg_label: str = "",
+    x_recon: np.ndarray = None
 ):
-    """Executes DerivedFunction calculation to combine reconstructions into a derived quantity."""
-    print(f"\n--- Running Derived Function Analysis for '{derived_name}' ---")
+    """Executes DerivedFunction calculation to combine reconstructions into derived quantities and saves results to disk."""
+    print(f"\n--- Running Derived Function Analysis for '{derived_names}' ---")
     reconstructor = DerivedFunction(recon_dict, cov_dict, method_dict, chatty=True)
-    derived_res = reconstructor.run([derived_logic], [derived_name])
-    return derived_res
+    derived_sample = reconstructor.run(derived_logics, derived_names)
+
+    # Save outputs if outroot is provided
+    if outroot and outroot.strip() and derived_sample is not None and x_recon is not None:
+        clean_outroot = outroot.strip()
+        out_dir = os.path.dirname(clean_outroot)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
+        safe_cfg_label = cfg_label.replace(" ", "_")
+
+        all_pars = derived_sample.getParamNames().list()
+        means = derived_sample.getMeans()
+        vars_arr = derived_sample.getVars()
+        full_cov = derived_sample.getCovMatrix()
+
+        for d_name in derived_names:
+            safe_d_name = d_name.replace(" ", "_")
+            if safe_cfg_label:
+                base_filename = f"{clean_outroot}_{safe_cfg_label}_{safe_d_name}"
+            else:
+                base_filename = f"{clean_outroot}_{safe_d_name}"
+
+            indices = [i for i, par in enumerate(all_pars) if par.startswith(f"{d_name}_")]
+            if indices:
+                d_means = means[indices]
+                d_errors = np.sqrt(vars_arr[indices])
+                
+                df_out = pd.DataFrame({
+                    'x': x_recon[:len(d_means)],
+                    'value': d_means,
+                    'error': d_errors
+                })
+
+                means_file = f"{base_filename}_derived_means.txt"
+                covmat_file = f"{base_filename}_derived_covmat.txt"
+
+                df_out.to_csv(means_file, sep=' ', index=False)
+                print(f"Saved derived means to: {means_file}")
+
+                if full_cov is not None:
+                    d_cov = full_cov[np.ix_(indices, indices)]
+                    cov_cols = [f"{d_name}_{i}" for i in range(len(indices))]
+                    df_cov = pd.DataFrame(d_cov, columns=cov_cols, index=cov_cols)
+                    df_cov.to_csv(covmat_file, sep=' ', index=True)
+                    print(f"Saved derived covmat to: {covmat_file}")
+
+    return derived_sample

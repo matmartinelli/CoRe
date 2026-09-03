@@ -46,7 +46,7 @@ def ensure_math_mode(s: str) -> str:
 
 
 def plot_data(data_df, name, x_label, y_labels):
-    fig, ax = plt.subplots(nrows=len(y_labels), ncols=1, figsize=(6,4*len(y_labels)))
+    fig, ax = plt.subplots(nrows=len(y_labels), ncols=1, figsize=(6, 4 * len(y_labels)))
     axes = ax if len(y_labels) > 1 else [ax]
 
     for ind, ylabel in enumerate(y_labels):
@@ -68,28 +68,27 @@ def plot_data(data_df, name, x_label, y_labels):
     st.pyplot(fig)
     plt.close(fig)
 
-def plot_covmat(cov_df, Ndata, x_label, y_labels):
 
+def plot_covmat(cov_df, Ndata, x_label, y_labels):
     cov = cov_df.copy()
 
     columns = {}
-    for i,ylab in enumerate(y_labels):
-        columns = columns | {'f'+str(i+1)+'_'+str(ind): ensure_math_mode(ylab+'_{'+str(ind)+'}') for ind in range(Ndata)}
+    for i, ylab in enumerate(y_labels):
+        columns = columns | {f'f{i+1}_{ind}': ensure_math_mode(f'{ylab}_{{{ind}}}') for ind in range(Ndata)}
 
-    cov = cov.rename(columns=columns,index=columns)
+    cov = cov.rename(columns=columns, index=columns)
 
-    fig, ax = plt.subplots(figsize=(6,4))
-    sb.heatmap(cov,ax=ax,xticklabels=False,yticklabels=False)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sb.heatmap(cov, ax=ax, xticklabels=False, yticklabels=False)
     st.pyplot(fig)
     plt.close(fig)
-
 
 
 def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
     colors = [red, yellow, 'purple', 'cyan']
     Nfuncs = len([col for col in dataset.columns if col != 'x' and '_err' not in col])
 
-    fig, ax = plt.subplots(ncols=Nfuncs, nrows=4, sharex=True, figsize=(5*Nfuncs, 12))
+    fig, ax = plt.subplots(ncols=Nfuncs, nrows=4, sharex=True, figsize=(5 * Nfuncs, 12))
     axes = ax if Nfuncs > 1 else ax.reshape(4, 1)
 
     for j in range(Nfuncs):
@@ -113,7 +112,6 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
             fnum = str(j + 1) if Nfuncs > 1 else ''
             clean_y = clean_tex_string(y_labels[j]) if j < len(y_labels) else f"f_{{{j+1}}}"
 
-            # Safely format labels without nesting '$' signs
             derlabels = [
                 f"${clean_y}$",
                 f"$d\\,{clean_y}/d\\,{clean_x}$",
@@ -162,16 +160,17 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
         axes[-1, i].set_xlabel(f"${clean_x}$")
 
     fig.align_ylabels()
-    plt.suptitle(f"Reconstruction: {data_name}",y=1.)
+    plt.suptitle(f"Reconstruction: {data_name}", y=1.)
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles,labels,loc='lower center',bbox_to_anchor=(0.5, 0.9),ncol=len(labels),frameon=False)
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.9), ncol=len(labels), frameon=False)
     plt.tight_layout()
     fig.subplots_adjust(top=0.82)
     st.pyplot(fig)
     plt.close(fig)
 
-def plot_derived_triangle(derived_res, derived_name, x_recon, color, label):
-    """Generates GetDist triangle plot for a single reconstruction method."""
+
+def plot_derived_triangle(derived_res, derived_names, x_recon, color, label):
+    """Generates GetDist triangle plot for derived reconstruction functions."""
     g = gplots.get_subplot_plotter(subplot_size=1, width_inch=12, scaling=False)
 
     g.settings.figure_legend_frame = False
@@ -183,9 +182,13 @@ def plot_derived_triangle(derived_res, derived_name, x_recon, color, label):
     g.settings.axis_marker_lw = 1
     g.settings.axis_tick_x_rotation = 45
 
+    param_names = []
+    for d_name in derived_names:
+        param_names.extend([f"{d_name}_{i}" for i in range(len(x_recon))])
+
     g.triangle_plot(
         [derived_res],
-        [derived_name + '_' + str(i) for i in range(len(x_recon))],
+        param_names,
         filled=True,
         contour_lws=2,
         contour_colors=[color],
@@ -196,30 +199,30 @@ def plot_derived_triangle(derived_res, derived_name, x_recon, color, label):
     return g.fig
 
 
-def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_name):
-    """Plots combined 1D summary of all derived reconstructions."""
+def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_name, tex_label=""):
+    """Plots combined 1D summary of derived reconstructions using custom TeX labels."""
     fig = plt.figure()
-    colors = [red,yellow,'purple','black']
+    colors = [red, yellow, 'purple', 'black']
 
-    for ind,(recon_label, derived_res) in enumerate(all_derived_results.items()):
-        sample  = derived_res['sample']
+    for ind, (recon_label, derived_res) in enumerate(all_derived_results.items()):
+        sample = derived_res['sample']
         x_recon = derived_res['x_recon']
         if sample is None:
             continue
 
-        all_pars  = sample.getParamNames().list()
-        labels    = sample.getParamNames().labels()
-        means     = {par: val for par,val in zip(all_pars,sample.getMeans())}
-        errors    = {par: np.sqrt(val) for par,val in zip(all_pars,sample.getVars())}
+        all_pars = sample.getParamNames().list()
+        means = {par: val for par, val in zip(all_pars, sample.getMeans())}
+        errors = {par: np.sqrt(val) for par, val in zip(all_pars, sample.getVars())}
 
-        derpars = [derived_name+'_'+str(i) for i in range(len(x_recon))]
-            
+        derpars = [f"{derived_name}_{i}" for i in range(len(x_recon))]
+
         reconstruction = pd.DataFrame({'x': x_recon})
-        reconstruction['value'] = [val for par,val in means.items() if par in derpars]
-        reconstruction['error'] = [val for par,val in errors.items() if par in derpars]
+        reconstruction['value'] = [val for par, val in means.items() if par in derpars]
+        reconstruction['error'] = [val for par, val in errors.items() if par in derpars]
 
-        color  = colors[ind]
-        method = recon_configs[ind]["method"]
+        color = colors[ind % len(colors)]
+        method = recon_configs[ind]["method"] if ind < len(recon_configs) else 'Gaussian Process'
+
         if method == 'Gaussian Process':
             plt.fill_between(
                 reconstruction['x'],
@@ -237,21 +240,21 @@ def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_na
             )
         elif method == 'Binned':
             plt.errorbar(
-                         reconstruction['x'],
-                         reconstruction['value'],
-                         yerr=reconstruction['error'],
-                         ls='',
-                         color=color,
-                         alpha=1,
-                         fmt='o',
-                         ms=4,
-                         capsize=3,
-                         elinewidth=2.0,
-                         label=recon_label
-                        )
+                reconstruction['x'],
+                reconstruction['value'],
+                yerr=reconstruction['error'],
+                ls='',
+                color=color,
+                alpha=1,
+                fmt='o',
+                ms=4,
+                capsize=3,
+                elinewidth=2.0,
+                label=recon_label
+            )
 
-
-    plt.xlabel(x_label)
-    plt.ylabel(derived_name)
+    plt.xlabel(ensure_math_mode(x_label))
+    ylabel_str = tex_label if tex_label else derived_name
+    plt.ylabel(ensure_math_mode(ylabel_str))
     plt.legend(loc='best')
     return fig

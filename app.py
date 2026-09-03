@@ -186,6 +186,8 @@ elif st.session_state.step == 3:
 
     if not st.session_state.last_recon_results or not st.session_state.recon_configs:
         st.warning("⚠️ No reconstruction results found. Please run Step 2 reconstructions first.")
+    elif not st.session_state.get("derived_funcs", []):
+        st.warning("⚠️ Please add at least one derived function in the sidebar.")
     else:
         num_configs = len(st.session_state.recon_configs)
         ds_names = list(st.session_state.data_store.keys())
@@ -194,24 +196,37 @@ elif st.session_state.step == 3:
         
         first_ds_key = list(st.session_state.data_store.keys())[0]
         x_label = st.session_state.data_store[first_ds_key].get("x_label", "x")
+        outroot = st.session_state.get("outroot", "")
 
         st.info(
-            f"Ready to compute derived quantities across **{num_configs}** reconstruction method(s) "
-            f"for dataset names: `{ds_names}`."
+            f"Ready to compute **{len(st.session_state.derived_funcs)}** derived quantity/quantities "
+            f"across **{num_configs}** reconstruction method(s) for dataset names: `{ds_names}`."
         )
 
         if st.button("🚀 Run Derived Function Analysis", type="primary"):
             method_dict = st.session_state.get("derived_method_dict", {})
-            derived_name = st.session_state.get("derived_name", "derived_func")
-            logic_str = st.session_state.get("derived_logic_str", "")
+            derived_funcs = st.session_state.get("derived_funcs", [])
 
-            try:
-                derived_logic = eval(logic_str, {"__builtins__": None, "np": np, "numpy": np})
-            except Exception as e:
-                st.error(f"Invalid derived logic syntax: {e}")
-                derived_logic = None
+            derived_logics = []
+            derived_names = []
+            derived_tex_map = {}
 
-            if derived_logic is not None:
+            valid_setup = True
+            for df_item in derived_funcs:
+                d_name = df_item["name"]
+                d_logic_str = df_item["logic_str"]
+                d_tex = df_item.get("tex_label", d_name)
+
+                try:
+                    f_logic = eval(d_logic_str, {"__builtins__": None, "np": np, "numpy": np})
+                    derived_logics.append(f_logic)
+                    derived_names.append(d_name)
+                    derived_tex_map[d_name] = d_tex
+                except Exception as e:
+                    st.error(f"Invalid derived logic syntax for '{d_name}': {e}")
+                    valid_setup = False
+
+            if valid_setup and derived_logics:
                 all_derived_results = {}
 
                 for cfg_idx, cfg in enumerate(st.session_state.recon_configs):
@@ -223,8 +238,11 @@ elif st.session_state.step == 3:
                     cov_dict = {}
 
                     for ds_idx, ds_name in enumerate(ds_names, start=1):
+                        alias = f"D{ds_idx}"
                         ds_recon = st.session_state.last_recon_results[ds_name][cfg_idx]
 
+                        recon_dict[alias] = ds_recon['means']
+                        cov_dict[alias] = ds_recon['covmat']
                         recon_dict[ds_name] = ds_recon['means']
                         cov_dict[ds_name] = ds_recon['covmat']
 
@@ -237,42 +255,51 @@ elif st.session_state.step == 3:
                                 recon_dict=recon_dict,
                                 cov_dict=cov_dict,
                                 method_dict=method_dict,
-                                derived_logic=derived_logic,
-                                derived_name=derived_name
+                                derived_logics=derived_logics,
+                                derived_names=derived_names,
+                                outroot=outroot,
+                                cfg_label=cfg_label,
+                                x_recon=x_recon
                             )
 
-                        #TODO: fix this shit!
-                        x_recon = recon_dict[list(recon_dict.keys())[0]]['x']
+                        grid_x = recon_dict[list(recon_dict.keys())[0]]['x'].values
 
-                        derived_res = {'sample': derived_sample,
-                                       'x_recon': x_recon}
+                        derived_res = {
+                            'sample': derived_sample,
+                            'x_recon': grid_x
+                        }
 
                         all_derived_results[cfg_label] = derived_res
-                        st.success(f"Completed derived reconstruction for `{cfg_label}`!")
+                        st.success(f"Completed derived reconstructions for `{cfg_label}`!")
 
-                        if derived_res is not None:
+                        if derived_sample is not None:
                             st.markdown("#### GetDist Triangle Plot")
                             fig_tri = plot_derived_triangle(
                                 derived_res=derived_sample,
-                                derived_name=derived_name,
-                                x_recon=x_recon,
+                                derived_names=derived_names,
+                                x_recon=grid_x,
                                 color=cfg.get('color', 'blue'),
                                 label=cfg_label
                             )
                             st.pyplot(fig_tri)
 
                     except Exception as e:
-                        st.error(f"Error computing derived function for configuration '{cfg_label}': {e}")
+                        st.error(f"Error computing derived functions for configuration '{cfg_label}': {e}")
 
                 st.session_state.derived_results = all_derived_results
 
                 if all_derived_results:
                     st.markdown("---")
-                    st.markdown("## Overall Derived Function Comparison")
-                    fig_summary = plot_derived_summary(
-                        all_derived_results=all_derived_results,
-                        recon_configs=st.session_state.recon_configs,
-                        x_label=x_label,
-                        derived_name=derived_name
-                    )
-                    st.pyplot(fig_summary)
+                    st.markdown("## Overall Derived Function Comparisons")
+                    
+                    for d_name in derived_names:
+                        d_tex = derived_tex_map.get(d_name, d_name)
+                        st.markdown(f"### Derived Function: `{d_name}`")
+                        fig_summary = plot_derived_summary(
+                            all_derived_results=all_derived_results,
+                            recon_configs=st.session_state.recon_configs,
+                            x_label=x_label,
+                            derived_name=d_name,
+                            tex_label=d_tex
+                        )
+                        st.pyplot(fig_summary)
