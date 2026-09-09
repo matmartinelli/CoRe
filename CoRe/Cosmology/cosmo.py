@@ -12,7 +12,7 @@ import camb
 
 class CalcCosmology:
 
-    def __init__(self,params,zcalc=np.linspace(0.,5,1000)):
+    def __init__(self,params,zcalc=np.linspace(0.001,5,1000)):
 
         self.zcalc  = zcalc
 
