@@ -143,7 +143,6 @@ def run_single_reconstruction(
         'score': score
     }
 
-
 def run_derived_reconstruction(
     recon_dict: dict,
     cov_dict: dict,
@@ -153,38 +152,43 @@ def run_derived_reconstruction(
     outroot: str = "",
     cfg_label: str = "",
     x_recon: np.ndarray = None
-):
-    """Executes DerivedFunction calculation to combine reconstructions into derived quantities and saves results to disk."""
-    print(f"\n--- Running Derived Function Analysis for '{derived_names}' ---")
-    reconstructor = DerivedFunction(recon_dict, cov_dict, method_dict, chatty=True)
-    derived_sample = reconstructor.run(derived_logics, derived_names)
+) -> dict:
+    """Executes DerivedFunction calculation independently for each derived quantity to avoid joint multi-dimensional matrix overflow."""
+    derived_samples = {}
 
-    # Save outputs if outroot is provided
-    if outroot and outroot.strip() and derived_sample is not None and x_recon is not None:
-        clean_outroot = outroot.strip()
-        out_dir = os.path.dirname(clean_outroot)
-        if out_dir:
-            os.makedirs(out_dir, exist_ok=True)
+    for d_logic, d_name in zip(derived_logics, derived_names):
+        print(f"\n--- Running Derived Function Analysis for '{d_name}' ---")
+        
+        # Evaluate each derived function individually (1 x N parameter space)
+        reconstructor = DerivedFunction(recon_dict, cov_dict, method_dict, chatty=True)
+        sample = reconstructor.run([d_logic], [d_name])
+        derived_samples[d_name] = sample
 
-        safe_cfg_label = cfg_label.replace(" ", "_")
+        # Save individual outputs if outroot is provided
+        if outroot and outroot.strip() and sample is not None and x_recon is not None:
+            clean_outroot = outroot.strip()
+            out_dir = os.path.dirname(clean_outroot)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
 
-        all_pars = derived_sample.getParamNames().list()
-        means = derived_sample.getMeans()
-        vars_arr = derived_sample.getVars()
-        full_cov = derived_sample.getCovMatrix()
-
-        for d_name in derived_names:
+            safe_cfg_label = cfg_label.replace(" ", "_")
             safe_d_name = d_name.replace(" ", "_")
+
             if safe_cfg_label:
                 base_filename = f"{clean_outroot}_{safe_cfg_label}_{safe_d_name}"
             else:
                 base_filename = f"{clean_outroot}_{safe_d_name}"
 
+            all_pars = sample.getParamNames().list()
+            means = sample.getMeans()
+            vars_arr = sample.getVars()
+            full_cov = sample.getCovMatrix()
+
             indices = [i for i, par in enumerate(all_pars) if par.startswith(f"{d_name}_")]
             if indices:
                 d_means = means[indices]
-                d_errors = np.sqrt(vars_arr[indices])
-                
+                d_errors = np.sqrt(np.maximum(vars_arr[indices], 0.0))
+
                 df_out = pd.DataFrame({
                     'x': x_recon[:len(d_means)],
                     'value': d_means,
@@ -204,4 +208,4 @@ def run_derived_reconstruction(
                     df_cov.to_csv(covmat_file, sep=' ', index=True)
                     print(f"Saved derived covmat to: {covmat_file}")
 
-    return derived_sample
+    return derived_samples

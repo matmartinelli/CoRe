@@ -45,19 +45,13 @@ def render_sidebar_step3():
 
     # Initialize derived_funcs list if empty
     if "derived_funcs" not in st.session_state or not st.session_state.derived_funcs:
-        st.session_state.derived_funcs = [
-            {
-                "name": "ratio_D1_D2",
-                "logic_str": "lambda D1, D2: D1 / D2",
-                "tex_label": r"D_1 / D_2"
-            }
-        ]
+        st.session_state.derived_funcs = []
 
     # Add new derived function form
     with st.sidebar.form("add_derived_func_form", clear_on_submit=True):
         st.markdown("**Add Derived Function**")
         d_name = st.text_input("Quantity Name", placeholder="e.g. ratio_D1_D2")
-        d_logic = st.text_input("Lambda Expression", placeholder="e.g. lambda D1, D2: D1 / D2")
+        d_logic = st.text_input("Lambda Expression", placeholder="e.g. lambda x, data1_f1, data2_d1: (1+x)*data2_d1 / data1_f1")
         d_tex = st.text_input("TeX Label", placeholder=r"e.g. D_1 / D_2")
         
         add_btn = st.form_submit_button("➕ Add Derived Function")

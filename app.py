@@ -237,12 +237,9 @@ elif st.session_state.step == 3:
                     recon_dict = {}
                     cov_dict = {}
 
-                    for ds_idx, ds_name in enumerate(ds_names, start=1):
-                        alias = f"D{ds_idx}"
+                    for ds_name in ds_names:
                         ds_recon = st.session_state.last_recon_results[ds_name][cfg_idx]
 
-                        recon_dict[alias] = ds_recon['means']
-                        cov_dict[alias] = ds_recon['covmat']
                         recon_dict[ds_name] = ds_recon['means']
                         cov_dict[ds_name] = ds_recon['covmat']
 
@@ -251,7 +248,7 @@ elif st.session_state.step == 3:
 
                     try:
                         with st_capture_output(log_placeholder):
-                            derived_sample = run_derived_reconstruction(
+                            derived_samples_dict = run_derived_reconstruction(
                                 recon_dict=recon_dict,
                                 cov_dict=cov_dict,
                                 method_dict=method_dict,
@@ -264,24 +261,33 @@ elif st.session_state.step == 3:
 
                         grid_x = recon_dict[list(recon_dict.keys())[0]]['x'].values
 
-                        derived_res = {
-                            'sample': derived_sample,
+                        # Combine individual samples under single dict for plotting downstream
+                        combined_sample = list(derived_samples_dict.values())[0] if derived_samples_dict else None
+                        
+                        all_derived_results[cfg_label] = {
+                            'sample': combined_sample,
+                            'samples_dict': derived_samples_dict,
                             'x_recon': grid_x
                         }
 
-                        all_derived_results[cfg_label] = derived_res
                         st.success(f"Completed derived reconstructions for `{cfg_label}`!")
 
-                        if derived_sample is not None:
-                            st.markdown("#### GetDist Triangle Plot")
-                            fig_tri = plot_derived_triangle(
-                                derived_res=derived_sample,
-                                derived_names=derived_names,
-                                x_recon=grid_x,
-                                color=cfg.get('color', 'blue'),
-                                label=cfg_label
-                            )
-                            st.pyplot(fig_tri)
+                        # Render independent 2D triangle plots for each derived quantity
+                        for d_name, d_sample in derived_samples_dict.items():
+                            if d_sample is not None:
+                                st.markdown(f"#### GetDist Triangle Plot: `{d_name}`")
+                                try:
+                                    fig_tri = plot_derived_triangle(
+                                        derived_res=d_sample,
+                                        derived_names=[d_name],
+                                        x_recon=grid_x,
+                                        color=cfg.get('color', 'blue'),
+                                        label=cfg_label,
+                                        max_pts=6
+                                    )
+                                    st.pyplot(fig_tri)
+                                except Exception as plt_err:
+                                    st.warning(f"Skipped rendering 2D triangle plot for `{d_name}`: {plt_err}")
 
                     except Exception as e:
                         st.error(f"Error computing derived functions for configuration '{cfg_label}': {e}")

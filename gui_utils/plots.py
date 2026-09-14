@@ -168,23 +168,29 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
     st.pyplot(fig)
     plt.close(fig)
 
-
-def plot_derived_triangle(derived_res, derived_names, x_recon, color, label):
-    """Generates GetDist triangle plot for derived reconstruction functions."""
-    g = gplots.get_subplot_plotter(subplot_size=1, width_inch=12, scaling=False)
+def plot_derived_triangle(derived_res, derived_names, x_recon, color, label, max_pts=6):
+    """Generates a GetDist triangle plot safely downsampled for high-density grids."""
+    g = gplots.get_subplot_plotter(subplot_size=1.2, width_inch=10, scaling=False)
 
     g.settings.figure_legend_frame = False
-    g.settings.axes_fontsize = 20
-    g.settings.axes_labelsize = 20
-    g.settings.legend_fontsize = 20
+    g.settings.axes_fontsize = 14
+    g.settings.axes_labelsize = 14
+    g.settings.legend_fontsize = 14
     g.settings.axis_marker_color = 'black'
     g.settings.axis_marker_ls = '--'
     g.settings.axis_marker_lw = 1
     g.settings.axis_tick_x_rotation = 45
 
+    N = len(x_recon)
+    # Downsample parameter indices if grid size N is large to prevent GetDist memory crashes
+    if N > max_pts:
+        selected_indices = np.linspace(0, N - 1, max_pts, dtype=int)
+    else:
+        selected_indices = list(range(N))
+
     param_names = []
     for d_name in derived_names:
-        param_names.extend([f"{d_name}_{i}" for i in range(len(x_recon))])
+        param_names.extend([f"{d_name}_{i}" for i in selected_indices])
 
     g.triangle_plot(
         [derived_res],
@@ -197,7 +203,6 @@ def plot_derived_triangle(derived_res, derived_names, x_recon, color, label):
     g.fig.align_ylabels()
     g.fig.align_xlabels()
     return g.fig
-
 
 def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_name, tex_label=""):
     """Plots combined 1D summary of derived reconstructions using custom TeX labels."""
