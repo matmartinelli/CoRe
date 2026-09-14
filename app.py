@@ -276,6 +276,7 @@ elif st.session_state.step == 3:
                         for d_name, d_sample in derived_samples_dict.items():
                             if d_sample is not None:
                                 st.markdown(f"#### GetDist Triangle Plot: `{d_name}`")
+                                d_tex = derived_tex_map.get(d_name, d_name)
                                 try:
                                     fig_tri = plot_derived_triangle(
                                         derived_res=d_sample,
@@ -283,7 +284,8 @@ elif st.session_state.step == 3:
                                         x_recon=grid_x,
                                         color=cfg.get('color', 'blue'),
                                         label=cfg_label,
-                                        max_pts=6
+                                        max_pts=6,
+                                        tex_label=d_tex
                                     )
                                     st.pyplot(fig_tri)
                                 except Exception as plt_err:
@@ -297,7 +299,6 @@ elif st.session_state.step == 3:
                 if all_derived_results:
                     st.markdown("---")
                     st.markdown("## Overall Derived Function Comparisons")
-                    
                     for d_name in derived_names:
                         d_tex = derived_tex_map.get(d_name, d_name)
                         st.markdown(f"### Derived Function: `{d_name}`")

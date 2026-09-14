@@ -168,8 +168,8 @@ def plot_observable_recon(dataset, data_name, recon_dicts, x_label, y_labels):
     st.pyplot(fig)
     plt.close(fig)
 
-def plot_derived_triangle(derived_res, derived_names, x_recon, color, label, max_pts=6):
-    """Generates a GetDist triangle plot safely downsampled for high-density grids."""
+def plot_derived_triangle(derived_res, derived_names, x_recon, color, label, max_pts=6, tex_label=""):
+    """Generates a GetDist triangle plot safely downsampled with proper LaTeX labels and multi-digit index formatting."""
     g = gplots.get_subplot_plotter(subplot_size=1.2, width_inch=10, scaling=False)
 
     g.settings.figure_legend_frame = False
@@ -188,9 +188,18 @@ def plot_derived_triangle(derived_res, derived_names, x_recon, color, label, max
     else:
         selected_indices = list(range(N))
 
-    param_names = []
-    for d_name in derived_names:
-        param_names.extend([f"{d_name}_{i}" for i in selected_indices])
+    d_name = derived_names[0]
+    param_names = [f"{d_name}_{i}" for i in selected_indices]
+
+    # Clean the TeX string label for GetDist display
+    base_tex = clean_tex_string(tex_label) if tex_label else d_name
+
+    # Safely update param labels inside GetDist's ParamNames structure
+    for i in selected_indices:
+        p_name = f"{d_name}_{i}"
+        param_obj = derived_res.paramNames.parWithName(p_name)
+        if param_obj is not None:
+            param_obj.label = f"{base_tex}_{{{i}}}" 
 
     g.triangle_plot(
         [derived_res],
@@ -210,7 +219,7 @@ def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_na
     colors = [red, yellow, 'purple', 'black']
 
     for ind, (recon_label, derived_res) in enumerate(all_derived_results.items()):
-        sample = derived_res['sample']
+        sample = derived_res['samples_dict'][derived_name]
         x_recon = derived_res['x_recon']
         if sample is None:
             continue
@@ -220,7 +229,6 @@ def plot_derived_summary(all_derived_results, recon_configs, x_label, derived_na
         errors = {par: np.sqrt(val) for par, val in zip(all_pars, sample.getVars())}
 
         derpars = [f"{derived_name}_{i}" for i in range(len(x_recon))]
-
         reconstruction = pd.DataFrame({'x': x_recon})
         reconstruction['value'] = [val for par, val in means.items() if par in derpars]
         reconstruction['error'] = [val for par, val in errors.items() if par in derpars]
