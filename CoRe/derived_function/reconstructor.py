@@ -11,6 +11,9 @@ from getdist.gaussian_mixtures import GaussianND
 
 from CoRe.utils.samplers_interface import SamplersInterface
 
+import io
+from contextlib import redirect_stdout
+
 class DerivedFunction:
     def __init__(self, recon_dict, cov_dict, method_dict, chatty=True):
         """
@@ -91,7 +94,8 @@ class DerivedFunction:
         label_vec   = [col.split('_') for col in full_matrix.columns]
         mean_vector = [self.recon_dict[lab[0]].iloc[int(lab[2])][lab[1]] for lab in label_vec]
 
-        sample = GaussianND(mean_vector,full_matrix,is_inv_cov=False,names=full_matrix.columns).MCSamples(self.Nsamples)
+        with redirect_stdout(io.StringIO()):
+            sample = GaussianND(mean_vector,full_matrix,is_inv_cov=False,names=full_matrix.columns).MCSamples(self.Nsamples)
 
         return sample
 

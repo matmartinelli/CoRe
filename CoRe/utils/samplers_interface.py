@@ -12,6 +12,9 @@ import emcee
 
 from getdist import MCSamples
 
+import io
+from contextlib import redirect_stdout
+
 class SamplersInterface:
 
     def __init__(self,sampler='nautilus',run_options='poor',outroot=None,chatty=True):
@@ -95,9 +98,10 @@ class SamplersInterface:
         if self.chatty:
             print('NAUTILUS SAMPLING FINISHED')
 
-        sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
-                           names=list(nautilus_dict.keys()),
-                           labels=list(nautilus_dict.values()))
+        with redirect_stdout(io.StringIO()):
+            sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
+                               names=list(nautilus_dict.keys()),
+                               labels=list(nautilus_dict.values()))
 
         return sample
 
@@ -106,13 +110,17 @@ class SamplersInterface:
 
         #TODO: create two settings
         if self.settings == 'poor':
-            sets = {'nwalkers': 32,        # Number of ensemble walkers (typically >= 2 * ndim)
-                    'nsteps': 3000,        # Total iterations per walker
-                    'burn_in': 500,        # Steps to discard from the start
+            sets = {'nwalkers': 32,
+                    'nsteps': 100,
+                    'burn_in': 10,
                     'ini_width': 1.e-2,    #TODO
-                    'thin': 5}             # Thinning factor to reduce autocorrelation
+                    'thin': 1}
         elif self.settings == 'good':
-            sys.exit('Not available yet') 
+            sets = {'nwalkers': 32,
+                    'nsteps': 3000,
+                    'burn_in': 500,
+                    'ini_width': 1.e-2,    #TODO
+                    'thin': 5} 
         elif type(self.settings) == dict:
             sets = self.settings
         else:
@@ -228,6 +236,7 @@ class SamplersInterface:
             param_names  = list(freepars.keys())
             param_labels = [parameters[par]['latex'] for par in param_names]
 
-        sample = MCSamples(samples=walker_chains,names=param_names,labels=param_labels)
+        with redirect_stdout(io.StringIO()):
+            sample = MCSamples(samples=walker_chains,names=param_names,labels=param_labels)
 
         return sample
