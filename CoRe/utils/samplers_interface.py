@@ -12,6 +12,9 @@ import emcee
 
 from getdist import MCSamples
 
+import io
+from contextlib import redirect_stdout
+
 class SamplersInterface:
 
     def __init__(self,sampler='nautilus',run_options='poor',outroot=None,chatty=True):
@@ -95,9 +98,10 @@ class SamplersInterface:
         if self.chatty:
             print('NAUTILUS SAMPLING FINISHED')
 
-        sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
-                           names=list(nautilus_dict.keys()),
-                           labels=list(nautilus_dict.values()))
+        with redirect_stdout(io.StringIO()):
+            sample = MCSamples(samples=results[list(nautilus_dict.keys())].values,
+                               names=list(nautilus_dict.keys()),
+                               labels=list(nautilus_dict.values()))
 
         return sample
 
@@ -232,6 +236,7 @@ class SamplersInterface:
             param_names  = list(freepars.keys())
             param_labels = [parameters[par]['latex'] for par in param_names]
 
-        sample = MCSamples(samples=walker_chains,names=param_names,labels=param_labels)
+        with redirect_stdout(io.StringIO()):
+            sample = MCSamples(samples=walker_chains,names=param_names,labels=param_labels)
 
         return sample
