@@ -4,7 +4,7 @@ emcee>=3.1.6
 getdist>=1.6.4
 jax>=0.4.30
 matplotlib>=3.11.2
-nautilus-sampler>=1.0.6
+nautilus-sampler
 numpy>=2.5.3
 pandas>=1.5.3
 pytest>=8.3.4
