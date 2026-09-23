@@ -3,9 +3,12 @@ camb
 emcee
 getdist
 jax
+matplotlib
 nautilus-sampler
 numpy
 pandas
 pytest
 scipy
+seaborn
 setuptools
+streamlit
